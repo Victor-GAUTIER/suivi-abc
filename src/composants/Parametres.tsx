@@ -169,8 +169,6 @@ export function Parametres({
 
   return (
     <div className="parametres">
-      <h2>Paramètres</h2>
-
       {message !== '' && <p className="message-information">{message}</p>}
 
       <section className="carte-statistique">

@@ -51,22 +51,33 @@ h3 {
 }
 
 .application {
-  width: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
 }
 
-.barre-haut {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.75rem 1rem;
+.barre-laterale {
   background-color: var(--couleur-principale);
   color: #ffffff;
 }
 
-.barre-haut h1 {
-  flex: 1;
+.identite {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+}
+
+.identite h1 {
   margin: 0;
   font-size: 1.15rem;
+}
+
+.profil-actif {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .selecteur-profil select {
@@ -111,15 +122,16 @@ h3 {
   font-weight: 700;
 }
 
-.corps {
-  display: flex;
-  flex-direction: column;
-}
-
 .contenu {
   flex: 1;
   min-width: 0;
   padding: 1rem;
+}
+
+.titre-page {
+  margin: 0 0 1rem;
+  font-size: 1.5rem;
+  color: var(--couleur-principale);
 }
 
 .contenu-accueil {
@@ -501,42 +513,60 @@ button {
 }
 
 @media (min-width: 720px) {
-  /* Menu à gauche sur écran large. Sur petit écran, il reste en barre horizontale. */
-  .corps {
+  /* Écran large : tout est dans la barre latérale de gauche. */
+  .application {
     flex-direction: row;
+    align-items: flex-start;
+  }
+
+  .barre-laterale {
+    position: sticky;
+    top: 0;
+    display: flex;
+    flex: 0 0 15rem;
+    flex-direction: column;
+    height: 100vh;
+    overflow-y: auto;
+  }
+
+  .identite {
+    flex-direction: column;
     align-items: stretch;
-    min-height: calc(100vh - 4rem);
+    padding: 1.25rem 1rem;
+  }
+
+  .profil-actif .selecteur-profil {
+    flex: 1;
+  }
+
+  .selecteur-profil select {
+    width: 100%;
   }
 
   .onglets {
-    flex: 0 0 13rem;
     flex-direction: column;
     overflow-x: visible;
     padding: 0.5rem 0;
-    border-right: 1px solid var(--couleur-bordure);
-    background-color: var(--couleur-carte);
+    background-color: transparent;
   }
 
   .onglet {
     flex: none;
-    min-height: 3rem;
     padding: 0 1.25rem;
     border-left: 4px solid transparent;
-    color: var(--couleur-texte);
     font-size: 1rem;
     text-align: left;
   }
 
   .onglet:hover {
-    background-color: var(--couleur-fond);
+    background-color: var(--couleur-principale-survol);
   }
 
   .onglet-actif,
   .onglet-actif:hover {
-    border-left-color: var(--couleur-principale);
-    background-color: #f3e8f6;
-    color: var(--couleur-principale);
-    font-weight: 700;
+    border-left-color: #ffffff;
+    background-color: var(--couleur-principale-survol);
+    color: #ffffff;
   }
 
   .contenu {
@@ -550,4 +580,81 @@ button {
   .pastille-calendrier {
     font-size: 0.75rem;
   }
+}
+
+/* Formulaire de saisie compact : champs côte à côte pour éviter de défiler. */
+.formulaire-compact {
+  gap: 0.75rem;
+}
+
+.ligne-champs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 0.75rem;
+  align-items: start;
+}
+
+.options-analyse .ligne-champs {
+  margin-top: 0.75rem;
+}
+
+.champ-liste {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.champ-liste-libelle {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.champ-liste-ajout {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.champ-liste-ajout input {
+  flex: 1;
+  min-width: 0;
+}
+
+.pastilles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pastille {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.15rem 0.2rem 0.15rem 0.6rem;
+  border-radius: 999px;
+  background-color: #f3e8f6;
+  color: var(--couleur-principale);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.pastille button {
+  width: 1.4rem;
+  height: 1.4rem;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--couleur-principale);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.pastille button:hover {
+  background-color: #e3c9ea;
 }

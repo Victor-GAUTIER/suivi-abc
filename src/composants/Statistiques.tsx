@@ -75,7 +75,6 @@ export function Statistiques({ entrees, typesParIdentifiant }: ProprietesStatist
   return (
     <div>
       <div className="statistiques-entete">
-        <h2>Statistiques</h2>
         <label className="statistiques-periode">
           Période
           <select

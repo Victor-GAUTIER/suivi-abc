@@ -15,6 +15,7 @@ import { FormulaireEntree } from './composants/FormulaireEntree'
 import { Journal } from './composants/Journal'
 import { Parametres } from './composants/Parametres'
 import { Statistiques } from './composants/Statistiques'
+import { extraireListesConnues } from './listes'
 import type { EntreeABC, TypeComportement } from './types'
 
 type Onglet = 'saisie' | 'journal' | 'calendrier' | 'statistiques' | 'parametres'
@@ -54,6 +55,11 @@ export function App() {
     [profilActifId],
   )
 
+  const entreesTousProfils = useLiveQuery(
+    () => baseSuiviABC.entrees.filter((entree) => !entree.supprime).toArray(),
+    [],
+  )
+
   useEffect(() => {
     async function initialiser() {
       await initialiserTypesParDefaut()
@@ -84,6 +90,8 @@ export function App() {
   for (const typeComportement of typesTousConfondus ?? []) {
     typesParIdentifiant.set(typeComportement.id, typeComportement)
   }
+
+  const listesConnues = extraireListesConnues(entreesTousProfils ?? [], auteur)
 
   async function changerProfilActif(nouveauProfilId: string) {
     setProfilActifId(nouveauProfilId)
@@ -152,39 +160,47 @@ export function App() {
 
   const entreesAffichees = entreesDuProfil ?? []
 
+  const libelleOngletActif = ONGLETS.find((onglet) => onglet.identifiant === ongletActif)?.libelle ?? ''
+  const titrePage =
+    ongletActif === 'saisie' && entreeEnEdition !== null
+      ? 'Modifier le comportement'
+      : libelleOngletActif
+
   return (
     <div className="application">
-      <header className="barre-haut">
-        <h1>Suivi ABC</h1>
-        <label className="selecteur-profil">
-          <span className="visuellement-cache">Profil actif</span>
-          <select
-            value={profilActifId}
-            onChange={(evenement) => void changerProfilActif(evenement.target.value)}
-          >
-            {profils.map((profil) => (
-              <option key={profil.id} value={profil.id}>
-                {profil.code}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button
-          type="button"
-          className="bouton-navigation"
-          onClick={() => {
-            const code = window.prompt('Code du nouveau profil (initiales ou code) :')
-            if (code !== null && code.trim() !== '') {
-              void creerProfil(code).then((profil) => changerProfilActif(profil.id))
-            }
-          }}
-          aria-label="Ajouter un profil"
-        >
-          +
-        </button>
-      </header>
+      <aside className="barre-laterale">
+        <div className="identite">
+          <h1>Suivi ABC</h1>
+          <div className="profil-actif">
+            <label className="selecteur-profil">
+              <span className="visuellement-cache">Profil actif</span>
+              <select
+                value={profilActifId}
+                onChange={(evenement) => void changerProfilActif(evenement.target.value)}
+              >
+                {profils.map((profil) => (
+                  <option key={profil.id} value={profil.id}>
+                    {profil.code}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              type="button"
+              className="bouton-navigation"
+              onClick={() => {
+                const code = window.prompt('Code du nouveau profil (initiales ou code) :')
+                if (code !== null && code.trim() !== '') {
+                  void creerProfil(code).then((profil) => changerProfilActif(profil.id))
+                }
+              }}
+              aria-label="Ajouter un profil"
+            >
+              +
+            </button>
+          </div>
+        </div>
 
-      <div className="corps">
         <nav className="onglets" aria-label="Menu principal">
           {ONGLETS.map((onglet) => (
             <button
@@ -203,49 +219,52 @@ export function App() {
             </button>
           ))}
         </nav>
+      </aside>
 
-        <main className="contenu">
-          {ongletActif === 'saisie' && (
-            <FormulaireEntree
-              key={entreeEnEdition?.id ?? 'nouvelle-entree'}
-              profilId={profilActifId}
-              typesComportement={typesComportement}
-              auteurParDefaut={auteur}
-              entreeInitiale={entreeEnEdition}
-              onTermine={terminerSaisie}
-            />
-          )}
-          {ongletActif === 'journal' && (
-            <Journal
-              entrees={entreesAffichees}
-              typesParIdentifiant={typesParIdentifiant}
-              onModifier={demanderModification}
-              onSupprimer={demanderSuppression}
-            />
-          )}
-          {ongletActif === 'calendrier' && (
-            <Calendrier
-              entrees={entreesAffichees}
-              typesParIdentifiant={typesParIdentifiant}
-              onModifier={demanderModification}
-              onSupprimer={demanderSuppression}
-            />
-          )}
-          {ongletActif === 'statistiques' && (
-            <Statistiques entrees={entreesAffichees} typesParIdentifiant={typesParIdentifiant} />
-          )}
-          {ongletActif === 'parametres' && (
-            <Parametres
-              profils={profils}
-              profilActifId={profilActifId}
-              typesComportement={typesComportement}
-              entreesDuProfilActif={entreesAffichees}
-              auteur={auteur}
-              onAuteurChange={setAuteur}
-            />
-          )}
-        </main>
-      </div>
+      <main className="contenu">
+        <h2 className="titre-page">{titrePage}</h2>
+        {ongletActif === 'saisie' && (
+          <FormulaireEntree
+            key={entreeEnEdition?.id ?? 'nouvelle-entree'}
+            profilId={profilActifId}
+            typesComportement={typesComportement}
+            auteurParDefaut={auteur}
+            listesConnues={listesConnues}
+            entreeInitiale={entreeEnEdition}
+            onAuteurUtilise={setAuteur}
+            onTermine={terminerSaisie}
+          />
+        )}
+        {ongletActif === 'journal' && (
+          <Journal
+            entrees={entreesAffichees}
+            typesParIdentifiant={typesParIdentifiant}
+            onModifier={demanderModification}
+            onSupprimer={demanderSuppression}
+          />
+        )}
+        {ongletActif === 'calendrier' && (
+          <Calendrier
+            entrees={entreesAffichees}
+            typesParIdentifiant={typesParIdentifiant}
+            onModifier={demanderModification}
+            onSupprimer={demanderSuppression}
+          />
+        )}
+        {ongletActif === 'statistiques' && (
+          <Statistiques entrees={entreesAffichees} typesParIdentifiant={typesParIdentifiant} />
+        )}
+        {ongletActif === 'parametres' && (
+          <Parametres
+            profils={profils}
+            profilActifId={profilActifId}
+            typesComportement={typesComportement}
+            entreesDuProfilActif={entreesAffichees}
+            auteur={auteur}
+            onAuteurChange={setAuteur}
+          />
+        )}
+      </main>
     </div>
   )
 }
