@@ -112,7 +112,14 @@ h3 {
   font-weight: 700;
 }
 
+.corps {
+  display: flex;
+  flex-direction: column;
+}
+
 .contenu {
+  flex: 1;
+  min-width: 0;
   padding: 1rem;
 }
 
@@ -495,6 +502,48 @@ button {
 }
 
 @media (min-width: 720px) {
+  .application {
+    max-width: 1120px;
+  }
+
+  /* Menu à gauche sur écran large. Sur petit écran, il reste en barre horizontale. */
+  .corps {
+    flex-direction: row;
+    align-items: stretch;
+    min-height: calc(100vh - 4rem);
+  }
+
+  .onglets {
+    flex: 0 0 13rem;
+    flex-direction: column;
+    overflow-x: visible;
+    padding: 0.5rem 0;
+    border-right: 1px solid var(--couleur-bordure);
+    background-color: var(--couleur-carte);
+  }
+
+  .onglet {
+    flex: none;
+    min-height: 3rem;
+    padding: 0 1.25rem;
+    border-left: 4px solid transparent;
+    color: var(--couleur-texte);
+    font-size: 1rem;
+    text-align: left;
+  }
+
+  .onglet:hover {
+    background-color: var(--couleur-fond);
+  }
+
+  .onglet-actif,
+  .onglet-actif:hover {
+    border-left-color: var(--couleur-principale);
+    background-color: #f3e8f6;
+    color: var(--couleur-principale);
+    font-weight: 700;
+  }
+
   .contenu {
     padding: 1.5rem;
   }

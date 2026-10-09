@@ -184,65 +184,68 @@ export function App() {
         </button>
       </header>
 
-      <nav className="onglets">
-        {ONGLETS.map((onglet) => (
-          <button
-            key={onglet.identifiant}
-            type="button"
-            className={onglet.identifiant === ongletActif ? 'onglet onglet-actif' : 'onglet'}
-            onClick={() => {
-              if (onglet.identifiant !== 'saisie') {
-                setEntreeEnEdition(null)
-              }
-              setOngletActif(onglet.identifiant)
-            }}
-          >
-            {onglet.libelle}
-          </button>
-        ))}
-      </nav>
+      <div className="corps">
+        <nav className="onglets" aria-label="Menu principal">
+          {ONGLETS.map((onglet) => (
+            <button
+              key={onglet.identifiant}
+              type="button"
+              className={onglet.identifiant === ongletActif ? 'onglet onglet-actif' : 'onglet'}
+              aria-current={onglet.identifiant === ongletActif ? 'page' : undefined}
+              onClick={() => {
+                if (onglet.identifiant !== 'saisie') {
+                  setEntreeEnEdition(null)
+                }
+                setOngletActif(onglet.identifiant)
+              }}
+            >
+              {onglet.libelle}
+            </button>
+          ))}
+        </nav>
 
-      <main className="contenu">
-        {ongletActif === 'saisie' && (
-          <FormulaireEntree
-            key={entreeEnEdition?.id ?? 'nouvelle-entree'}
-            profilId={profilActifId}
-            typesComportement={typesComportement}
-            auteurParDefaut={auteur}
-            entreeInitiale={entreeEnEdition}
-            onTermine={terminerSaisie}
-          />
-        )}
-        {ongletActif === 'journal' && (
-          <Journal
-            entrees={entreesAffichees}
-            typesParIdentifiant={typesParIdentifiant}
-            onModifier={demanderModification}
-            onSupprimer={demanderSuppression}
-          />
-        )}
-        {ongletActif === 'calendrier' && (
-          <Calendrier
-            entrees={entreesAffichees}
-            typesParIdentifiant={typesParIdentifiant}
-            onModifier={demanderModification}
-            onSupprimer={demanderSuppression}
-          />
-        )}
-        {ongletActif === 'statistiques' && (
-          <Statistiques entrees={entreesAffichees} typesParIdentifiant={typesParIdentifiant} />
-        )}
-        {ongletActif === 'parametres' && (
-          <Parametres
-            profils={profils}
-            profilActifId={profilActifId}
-            typesComportement={typesComportement}
-            entreesDuProfilActif={entreesAffichees}
-            auteur={auteur}
-            onAuteurChange={setAuteur}
-          />
-        )}
-      </main>
+        <main className="contenu">
+          {ongletActif === 'saisie' && (
+            <FormulaireEntree
+              key={entreeEnEdition?.id ?? 'nouvelle-entree'}
+              profilId={profilActifId}
+              typesComportement={typesComportement}
+              auteurParDefaut={auteur}
+              entreeInitiale={entreeEnEdition}
+              onTermine={terminerSaisie}
+            />
+          )}
+          {ongletActif === 'journal' && (
+            <Journal
+              entrees={entreesAffichees}
+              typesParIdentifiant={typesParIdentifiant}
+              onModifier={demanderModification}
+              onSupprimer={demanderSuppression}
+            />
+          )}
+          {ongletActif === 'calendrier' && (
+            <Calendrier
+              entrees={entreesAffichees}
+              typesParIdentifiant={typesParIdentifiant}
+              onModifier={demanderModification}
+              onSupprimer={demanderSuppression}
+            />
+          )}
+          {ongletActif === 'statistiques' && (
+            <Statistiques entrees={entreesAffichees} typesParIdentifiant={typesParIdentifiant} />
+          )}
+          {ongletActif === 'parametres' && (
+            <Parametres
+              profils={profils}
+              profilActifId={profilActifId}
+              typesComportement={typesComportement}
+              entreesDuProfilActif={entreesAffichees}
+              auteur={auteur}
+              onAuteurChange={setAuteur}
+            />
+          )}
+        </main>
+      </div>
     </div>
   )
 }
