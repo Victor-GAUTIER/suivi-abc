@@ -16,6 +16,8 @@ import { Journal } from './composants/Journal'
 import { Parametres } from './composants/Parametres'
 import { Statistiques } from './composants/Statistiques'
 import { extraireListesConnues } from './listes'
+import { initialiserSynchro } from './synchro/gestionnaire'
+import { SynchroGoogleDrive } from './composants/SynchroGoogleDrive'
 import type { EntreeABC, TypeComportement } from './types'
 
 type Onglet = 'saisie' | 'journal' | 'calendrier' | 'statistiques' | 'parametres'
@@ -72,6 +74,7 @@ export function App() {
         setAuteur(auteurMemorise)
       }
       setInitialisationTerminee(true)
+      void initialiserSynchro()
     }
     void initialiser()
   }, [])
@@ -150,6 +153,10 @@ export function App() {
             Créer le profil
           </button>
         </form>
+        <section className="carte-statistique accueil-synchro">
+          <h2>Déjà utilisé sur un autre appareil ?</h2>
+          <SynchroGoogleDrive />
+        </section>
         <p className="texte-aide">
           Vous avez déjà une sauvegarde ? Créez un profil provisoire, puis importez le fichier dans
           Paramètres.

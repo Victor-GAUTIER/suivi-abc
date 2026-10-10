@@ -20,6 +20,7 @@ import {
   serialiserSauvegarde,
 } from '../sauvegarde'
 import { telechargerTexte } from '../telechargement'
+import { SynchroGoogleDrive } from './SynchroGoogleDrive'
 import type { EnveloppeChiffree, EntreeABC, Profil, TypeComportement } from '../types'
 
 interface ProprietesParametres {
@@ -264,6 +265,10 @@ export function Parametres({
             Ajouter
           </button>
         </div>
+      </section>
+
+      <section className="carte-statistique">
+        <SynchroGoogleDrive />
       </section>
 
       <section className="carte-statistique">

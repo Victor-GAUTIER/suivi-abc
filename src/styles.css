@@ -658,3 +658,19 @@ button {
 .pastille button:hover {
   background-color: #e3c9ea;
 }
+
+/* Synchronisation Google Drive */
+.formulaire-sans-cadre {
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+
+.accueil-synchro {
+  margin-top: 1.5rem;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

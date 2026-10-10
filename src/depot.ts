@@ -7,11 +7,17 @@ const CLE_TYPES_INITIALISES = 'typesInitialises'
 const CLE_AUTEUR = 'auteur'
 const CLE_PROFIL_ACTIF = 'profilActif'
 
-const TYPES_PAR_DEFAUT: Array<Pick<TypeComportement, 'nom' | 'couleur'>> = [
-  { nom: 'Agitation', couleur: '#3b82f6' },
-  { nom: 'Opposition', couleur: '#f59e0b' },
-  { nom: 'Crise', couleur: '#ef4444' },
-  { nom: 'Comportement répétitif', couleur: '#10b981' },
+// Date très ancienne : toute modification ou suppression faite ensuite sur un appareil
+// sera plus récente et l'emportera lors de la fusion.
+const DATE_TYPES_PAR_DEFAUT = '1970-01-01T00:00:00.000Z'
+
+// Identifiants fixes : deux appareils qui créent ces types par défaut
+// ne produisent pas de doublons au moment de la synchro.
+const TYPES_PAR_DEFAUT: Array<Pick<TypeComportement, 'id' | 'nom' | 'couleur'>> = [
+  { id: 'type-defaut-agitation', nom: 'Agitation', couleur: '#3b82f6' },
+  { id: 'type-defaut-opposition', nom: 'Opposition', couleur: '#f59e0b' },
+  { id: 'type-defaut-crise', nom: 'Crise', couleur: '#ef4444' },
+  { id: 'type-defaut-comportement-repetitif', nom: 'Comportement répétitif', couleur: '#10b981' },
 ]
 
 export async function lireParametre(cle: string): Promise<string | undefined> {
@@ -35,15 +41,14 @@ export async function initialiserTypesParDefaut(): Promise<void> {
   }
   const nombreTypesExistants = await baseSuiviABC.typesComportement.count()
   if (nombreTypesExistants === 0) {
-    const horodatage = maintenantHorodatage()
     const typesAAjouter: TypeComportement[] = TYPES_PAR_DEFAUT.map((typeParDefaut) => ({
-      id: crypto.randomUUID(),
+      id: typeParDefaut.id,
       nom: typeParDefaut.nom,
       couleur: typeParDefaut.couleur,
-      modifieLe: horodatage,
+      modifieLe: DATE_TYPES_PAR_DEFAUT,
       supprime: false,
     }))
-    await baseSuiviABC.typesComportement.bulkAdd(typesAAjouter)
+    await baseSuiviABC.typesComportement.bulkPut(typesAAjouter)
   }
   await ecrireParametre(CLE_TYPES_INITIALISES, 'oui')
 }
