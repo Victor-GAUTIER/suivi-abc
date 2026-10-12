@@ -5,7 +5,7 @@ import type { Sauvegarde } from '../types'
 import { ErreurMotDePasse } from './types'
 import type { DepotLocal, ResultatSynchro, StockageDistant } from './types'
 
-async function lireSauvegardeDistante(
+export async function lireSauvegardeDistante(
   contenuDistant: string,
   motDePasse: string,
 ): Promise<Sauvegarde> {

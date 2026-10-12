@@ -16,6 +16,7 @@ import { Journal } from './composants/Journal'
 import { Parametres } from './composants/Parametres'
 import { Statistiques } from './composants/Statistiques'
 import { extraireListesConnues } from './listes'
+import { initialiserPartage } from './partage/gestionnairePartage'
 import { initialiserSynchro } from './synchro/gestionnaire'
 import { SynchroGoogleDrive } from './composants/SynchroGoogleDrive'
 import type { EntreeABC, TypeComportement } from './types'
@@ -75,6 +76,7 @@ export function App() {
       }
       setInitialisationTerminee(true)
       void initialiserSynchro()
+      void initialiserPartage()
     }
     void initialiser()
   }, [])

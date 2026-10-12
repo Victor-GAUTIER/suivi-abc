@@ -20,6 +20,7 @@ import {
   serialiserSauvegarde,
 } from '../sauvegarde'
 import { telechargerTexte } from '../telechargement'
+import { PartageProfils } from './PartageProfils'
 import { SynchroGoogleDrive } from './SynchroGoogleDrive'
 import type { EnveloppeChiffree, EntreeABC, Profil, TypeComportement } from '../types'
 
@@ -269,6 +270,10 @@ export function Parametres({
 
       <section className="carte-statistique">
         <SynchroGoogleDrive />
+      </section>
+
+      <section className="carte-statistique">
+        <PartageProfils profils={profils} profilActifId={profilActifId} />
       </section>
 
       <section className="carte-statistique">

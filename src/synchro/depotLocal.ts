@@ -2,57 +2,74 @@ import { baseSuiviABC } from '../db'
 import { maintenantHorodatage } from '../dates'
 import { elementsAEcrire } from '../fusion'
 import type { Sauvegarde } from '../types'
+import { extraireSauvegardeDuProfil } from '../partage/filtreProfil'
 import type { DepotLocal } from './types'
 
 // Pendant que la synchro écrit dans la base, on ne veut pas que ces écritures
 // déclenchent une nouvelle synchro (sinon : boucle sans fin).
 let ecritureParSynchroEnCours = false
 
-export const depotLocalDexie: DepotLocal = {
-  async lireSauvegarde(): Promise<Sauvegarde> {
-    const [profils, typesComportement, entrees] = await Promise.all([
-      baseSuiviABC.profils.toArray(),
-      baseSuiviABC.typesComportement.toArray(),
-      baseSuiviABC.entrees.toArray(),
-    ])
-    return { version: 1, exporteLe: maintenantHorodatage(), profils, typesComportement, entrees }
-  },
+async function lireToutesLesDonnees(): Promise<Sauvegarde> {
+  const [profils, typesComportement, entrees] = await Promise.all([
+    baseSuiviABC.profils.toArray(),
+    baseSuiviABC.typesComportement.toArray(),
+    baseSuiviABC.entrees.toArray(),
+  ])
+  return { version: 1, exporteLe: maintenantHorodatage(), profils, typesComportement, entrees }
+}
 
-  async appliquerSauvegarde(sauvegarde: Sauvegarde): Promise<number> {
-    ecritureParSynchroEnCours = true
-    try {
-      return await baseSuiviABC.transaction(
-        'rw',
-        [baseSuiviABC.profils, baseSuiviABC.typesComportement, baseSuiviABC.entrees],
-        async () => {
-          const profilsAEcrire = elementsAEcrire(
-            await baseSuiviABC.profils.toArray(),
-            sauvegarde.profils,
-          )
-          const typesAEcrire = elementsAEcrire(
-            await baseSuiviABC.typesComportement.toArray(),
-            sauvegarde.typesComportement,
-          )
-          const entreesAEcrire = elementsAEcrire(
-            await baseSuiviABC.entrees.toArray(),
-            sauvegarde.entrees,
-          )
-          if (profilsAEcrire.length > 0) {
-            await baseSuiviABC.profils.bulkPut(profilsAEcrire)
-          }
-          if (typesAEcrire.length > 0) {
-            await baseSuiviABC.typesComportement.bulkPut(typesAEcrire)
-          }
-          if (entreesAEcrire.length > 0) {
-            await baseSuiviABC.entrees.bulkPut(entreesAEcrire)
-          }
-          return profilsAEcrire.length + typesAEcrire.length + entreesAEcrire.length
-        },
-      )
-    } finally {
-      ecritureParSynchroEnCours = false
-    }
-  },
+async function ecrireSauvegardeDansLaBase(sauvegarde: Sauvegarde): Promise<number> {
+  ecritureParSynchroEnCours = true
+  try {
+    return await baseSuiviABC.transaction(
+      'rw',
+      [baseSuiviABC.profils, baseSuiviABC.typesComportement, baseSuiviABC.entrees],
+      async () => {
+        const profilsAEcrire = elementsAEcrire(
+          await baseSuiviABC.profils.toArray(),
+          sauvegarde.profils,
+        )
+        const typesAEcrire = elementsAEcrire(
+          await baseSuiviABC.typesComportement.toArray(),
+          sauvegarde.typesComportement,
+        )
+        const entreesAEcrire = elementsAEcrire(
+          await baseSuiviABC.entrees.toArray(),
+          sauvegarde.entrees,
+        )
+        if (profilsAEcrire.length > 0) {
+          await baseSuiviABC.profils.bulkPut(profilsAEcrire)
+        }
+        if (typesAEcrire.length > 0) {
+          await baseSuiviABC.typesComportement.bulkPut(typesAEcrire)
+        }
+        if (entreesAEcrire.length > 0) {
+          await baseSuiviABC.entrees.bulkPut(entreesAEcrire)
+        }
+        return profilsAEcrire.length + typesAEcrire.length + entreesAEcrire.length
+      },
+    )
+  } finally {
+    ecritureParSynchroEnCours = false
+  }
+}
+
+// Synchro personnelle : toutes les données de l'utilisateur.
+export const depotLocalDexie: DepotLocal = {
+  lireSauvegarde: lireToutesLesDonnees,
+  appliquerSauvegarde: ecrireSauvegardeDansLaBase,
+}
+
+// Synchro d'un profil partagé : seules les données de ce profil sont lues, envoyées ou reçues.
+export function creerDepotLocalPourProfil(profilId: string): DepotLocal {
+  return {
+    async lireSauvegarde(): Promise<Sauvegarde> {
+      return extraireSauvegardeDuProfil(await lireToutesLesDonnees(), profilId)
+    },
+    async appliquerSauvegarde(sauvegarde: Sauvegarde): Promise<number> {
+      return ecrireSauvegardeDansLaBase(extraireSauvegardeDuProfil(sauvegarde, profilId))
+    },
+  }
 }
 
 // Prévient quand l'utilisateur modifie ses données (profils, types, entrées).

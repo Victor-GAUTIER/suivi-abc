@@ -23,3 +23,6 @@ export interface ResultatSynchro {
 export class ErreurMotDePasse extends Error {}
 
 export class ErreurAuthentificationGoogle extends Error {}
+
+// Google refuse l'accès au fichier : droits insuffisants, accès retiré ou fichier supprimé.
+export class ErreurAccesFichierDrive extends Error {}
