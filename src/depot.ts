@@ -1,5 +1,6 @@
 import { baseSuiviABC } from './db'
 import { maintenantHorodatage } from './dates'
+import { trouverElementDeMemeNom } from './doublons'
 import { fusionnerParIdentifiant } from './fusion'
 import type { EntreeABC, Profil, Sauvegarde, TypeComportement } from './types'
 
@@ -53,10 +54,31 @@ export async function initialiserTypesParDefaut(): Promise<void> {
   await ecrireParametre(CLE_TYPES_INITIALISES, 'oui')
 }
 
+// Si un profil de même code existe déjà (par exemple reçu d'un autre appareil), on le réutilise
+// au lieu d'en créer un second : sinon la synchro afficherait deux profils identiques.
 export async function creerProfil(code: string): Promise<Profil> {
+  const codeNettoye = code.trim()
+  const profilsExistants = await baseSuiviABC.profils.toArray()
+  const profilDejaPresent = trouverElementDeMemeNom(
+    profilsExistants,
+    codeNettoye,
+    (profil) => profil.code,
+  )
+  if (profilDejaPresent !== undefined) {
+    if (!profilDejaPresent.supprime) {
+      return profilDejaPresent
+    }
+    const profilRestaure: Profil = {
+      ...profilDejaPresent,
+      supprime: false,
+      modifieLe: maintenantHorodatage(),
+    }
+    await baseSuiviABC.profils.put(profilRestaure)
+    return profilRestaure
+  }
   const nouveauProfil: Profil = {
     id: crypto.randomUUID(),
-    code: code.trim(),
+    code: codeNettoye,
     modifieLe: maintenantHorodatage(),
     supprime: false,
   }
@@ -78,10 +100,26 @@ export async function supprimerProfil(identifiant: string): Promise<void> {
   })
 }
 
+// Même principe que pour les profils : un type de même nom est réutilisé (et restauré s'il
+// avait été supprimé) plutôt que dupliqué.
 export async function creerType(nom: string, couleur: string): Promise<void> {
+  const nomNettoye = nom.trim()
+  const typesExistants = await baseSuiviABC.typesComportement.toArray()
+  const typeDejaPresent = trouverElementDeMemeNom(typesExistants, nomNettoye, (type) => type.nom)
+  if (typeDejaPresent !== undefined) {
+    if (typeDejaPresent.supprime) {
+      await baseSuiviABC.typesComportement.put({
+        ...typeDejaPresent,
+        supprime: false,
+        couleur,
+        modifieLe: maintenantHorodatage(),
+      })
+    }
+    return
+  }
   const nouveauType: TypeComportement = {
     id: crypto.randomUUID(),
-    nom: nom.trim(),
+    nom: nomNettoye,
     couleur,
     modifieLe: maintenantHorodatage(),
     supprime: false,
