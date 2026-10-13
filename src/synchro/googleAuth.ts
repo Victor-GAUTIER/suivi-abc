@@ -122,9 +122,10 @@ function chargerBibliothequeGoogle(): Promise<void> {
 
 // invite :
 // - 'none' : tentative silencieuse, sans fenêtre ;
-// - 'select_account' : connexion interactive avec choix du compte.
+// - 'consent' : connexion interactive. Seule valeur observée fonctionnelle sur le site en ligne :
+//   avec une invite vide ou 'select_account', la fenêtre se fermait sans renvoyer de jeton (popup_closed).
 async function demanderJeton(
-  invite: 'none' | 'select_account',
+  invite: 'none' | 'consent',
 ): Promise<JetonMemorise> {
   await chargerBibliothequeGoogle()
 
@@ -256,7 +257,7 @@ export async function obtenirJetonGoogle(
     (interactif && !demandeJetonEnCours.interactive)
   ) {
     const promesse = demanderJeton(
-      interactif ? 'select_account' : 'none',
+      interactif ? 'consent' : 'none',
     )
 
     const demande = {
