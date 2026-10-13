@@ -103,8 +103,11 @@ function chargerBibliothequeGoogle(): Promise<void> {
 
 // `invite` :
 // - 'none'  : tentative silencieuse, sans fenêtre (réussit si l'utilisateur a déjà autorisé l'app) ;
-// - ''      : connexion normale, doit être déclenchée par un clic de l'utilisateur.
-async function demanderJeton(invite: 'none' | ''): Promise<JetonMemorise> {
+// - 'select_account' : connexion par clic de l'utilisateur. Google affiche le choix du compte,
+//   donc la fenêtre reste ouverte jusqu'à un clic. Avec une invite vide, Google peut approuver et
+//   refermer la fenêtre instantanément, et la bibliothèque la prend alors pour une fenêtre
+//   fermée par l'utilisateur (erreur popup_closed, observée sur le site en ligne).
+async function demanderJeton(invite: 'none' | 'select_account'): Promise<JetonMemorise> {
   await chargerBibliothequeGoogle()
   const google = window.google
   if (google === undefined) {
@@ -161,7 +164,7 @@ export async function obtenirJetonGoogle(interactif: boolean): Promise<string> {
   // Plusieurs synchros peuvent demander un jeton en même temps : une seule demande part chez Google.
   // Une demande interactive (clic de l'utilisateur) ne réutilise jamais une demande silencieuse.
   if (demandeJetonEnCours === null || (interactif && !demandeJetonEnCours.interactive)) {
-    const promesse = demanderJeton(interactif ? '' : 'none')
+    const promesse = demanderJeton(interactif ? 'select_account' : 'none')
     const demande = { promesse, interactive: interactif }
     demandeJetonEnCours = demande
     const liberer = () => {
