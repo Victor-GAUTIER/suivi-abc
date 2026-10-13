@@ -34,6 +34,9 @@ jobs:
         run: npm test
 
       - name: Construire l'application
+        env:
+          VITE_GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
+          VITE_GOOGLE_API_KEY: ${{ vars.GOOGLE_API_KEY }}
         run: npm run build
 
       - name: Préparer le site pour Pages
