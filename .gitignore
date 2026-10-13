@@ -3,3 +3,4 @@ dist
 dev-dist
 *.log
 .env.local
+.DS_Store

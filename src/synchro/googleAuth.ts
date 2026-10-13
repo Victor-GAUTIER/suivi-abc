@@ -63,11 +63,18 @@ let demandeJetonEnCours: {
 
 let chargementBibliotheque: Promise<void> | null = null
 
-export const identifiantClientGoogle: string =
-  (import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined) ?? ''
+// DIAGNOSTIC TEMPORAIRE : numérote les demandes de jeton pour repérer d'éventuelles demandes concurrentes.
+let numeroDemandeDiagnostic = 0
 
-export const cleApiGoogle: string =
+// trim() : une valeur copiée dans une variable GitHub peut contenir un retour à la ligne ou un
+// espace invisible à la fin, ce qui rendrait l'identifiant inconnu de Google.
+export const identifiantClientGoogle: string = (
+  (import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined) ?? ''
+).trim()
+
+export const cleApiGoogle: string = (
   (import.meta.env.VITE_GOOGLE_API_KEY as string | undefined) ?? ''
+).trim()
 
 export function synchroGoogleEstConfiguree(): boolean {
   return identifiantClientGoogle !== ''
@@ -161,9 +168,23 @@ async function demanderJeton(
       [document, 'visibilitychange'],
     ]
     const surEvenement = (evenement: Event) => tracer(`page : ${evenement.type} — ${instantane()}`)
+    // DIAGNOSTIC TEMPORAIRE : messages reçus par la page pendant la connexion.
+    // Seuls l'origine et la forme du message sont tracés, jamais son contenu (il peut contenir le jeton).
+    const surMessage = (evenement: MessageEvent) => {
+      const donnees: unknown = evenement.data
+      let forme: string = typeof donnees
+      if (typeof donnees === 'string') {
+        forme = `string(${donnees.length} car.)`
+      } else if (donnees !== null && typeof donnees === 'object') {
+        forme = `objet{${Object.keys(donnees as Record<string, unknown>).join(',')}}`
+      }
+      tracer(`message reçu de ${evenement.origin} : ${forme}`)
+    }
     evenementsSuivis.forEach(([cible, type]) => cible.addEventListener(type, surEvenement))
+    window.addEventListener('message', surMessage)
     const arreterSuivi = () => {
       evenementsSuivis.forEach(([cible, type]) => cible.removeEventListener(type, surEvenement))
+      window.removeEventListener('message', surMessage)
     }
 
     const terminerAvecErreur = (erreur: Error) => {
@@ -253,7 +274,12 @@ async function demanderJeton(
       },
     })
 
-    tracer(`demande de jeton (invite=${invite}) — ${instantane()}`)
+    numeroDemandeDiagnostic += 1
+    tracer(
+      `demande n°${numeroDemandeDiagnostic} (invite=${invite}) client_id=${identifiantClientGoogle} ` +
+        `longueur=${identifiantClientGoogle.length} portées=${PORTEES_GOOGLE.split(' ').length} ` +
+        `adresse=${location.href} — ${instantane()}`,
+    )
     client.requestAccessToken({ prompt: invite })
   })
 }
