@@ -147,6 +147,24 @@ async function demanderJeton(
     const tracer = (evenement: string) => {
       console.info(`[Google] ${evenement} (+${Date.now() - debut} ms)`)
     }
+    // DIAGNOSTIC TEMPORAIRE : état de la page autour de la fenêtre Google.
+    const instantane = () => {
+      const activation = (navigator as Navigator & { userActivation?: { isActive: boolean } })
+        .userActivation
+      return `activation=${String(activation?.isActive ?? '?')} focus=${String(document.hasFocus())} visible=${document.visibilityState}`
+    }
+    const evenementsSuivis: Array<[EventTarget, string]> = [
+      [window, 'blur'],
+      [window, 'focus'],
+      [window, 'pagehide'],
+      [window, 'beforeunload'],
+      [document, 'visibilitychange'],
+    ]
+    const surEvenement = (evenement: Event) => tracer(`page : ${evenement.type} — ${instantane()}`)
+    evenementsSuivis.forEach(([cible, type]) => cible.addEventListener(type, surEvenement))
+    const arreterSuivi = () => {
+      evenementsSuivis.forEach(([cible, type]) => cible.removeEventListener(type, surEvenement))
+    }
 
     const terminerAvecErreur = (erreur: Error) => {
       if (termine) {
@@ -154,6 +172,7 @@ async function demanderJeton(
       }
 
       termine = true
+      arreterSuivi()
       clearTimeout(minuterie)
       if (minuterieFermeture !== null) {
         clearTimeout(minuterieFermeture)
@@ -193,6 +212,7 @@ async function demanderJeton(
         }
 
         termine = true
+        arreterSuivi()
         clearTimeout(minuterie)
         if (minuterieFermeture !== null) {
           clearTimeout(minuterieFermeture)
@@ -207,7 +227,7 @@ async function demanderJeton(
       },
 
       error_callback: (erreur) => {
-        tracer(`erreur Google : ${erreur.type ?? erreur.message ?? 'inconnue'}`)
+        tracer(`erreur Google : ${erreur.type ?? erreur.message ?? 'inconnue'} — ${instantane()}`)
         // Ignore notamment un événement de fermeture tardif
         // si le jeton a déjà été reçu.
         if (erreur.type === 'popup_closed' && !termine) {
@@ -233,6 +253,7 @@ async function demanderJeton(
       },
     })
 
+    tracer(`demande de jeton (invite=${invite}) — ${instantane()}`)
     client.requestAccessToken({ prompt: invite })
   })
 }
