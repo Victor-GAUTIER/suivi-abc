@@ -10,6 +10,7 @@ const PORTEES_GOOGLE =
 const MARGE_EXPIRATION_MILLISECONDES = 60_000
 const DELAI_TENTATIVE_SILENCIEUSE_MS = 15_000
 const DELAI_CONNEXION_INTERACTIVE_MS = 3 * 60_000
+const DELAI_GRACE_FERMETURE_MS = 4_000
 
 interface ReponseJetonGoogle {
   access_token?: string
@@ -140,6 +141,11 @@ async function demanderJeton(
         : DELAI_CONNEXION_INTERACTIVE_MS
 
     let termine = false
+    let minuterieFermeture: ReturnType<typeof setTimeout> | null = null
+    const debut = Date.now()
+    const tracer = (evenement: string) => {
+      console.info(`[Google] ${evenement} (+${Date.now() - debut} ms)`)
+    }
 
     const terminerAvecErreur = (erreur: Error) => {
       if (termine) {
@@ -148,6 +154,9 @@ async function demanderJeton(
 
       termine = true
       clearTimeout(minuterie)
+      if (minuterieFermeture !== null) {
+        clearTimeout(minuterieFermeture)
+      }
       rejeter(erreur)
     }
 
@@ -164,6 +173,7 @@ async function demanderJeton(
       scope: PORTEES_GOOGLE,
 
       callback: (reponse) => {
+        tracer(reponse.access_token !== undefined ? 'jeton reçu' : `réponse sans jeton (${reponse.error ?? '?'})`)
         // Ignore une réponse tardive si la demande est déjà terminée.
         if (termine) {
           return
@@ -183,6 +193,9 @@ async function demanderJeton(
 
         termine = true
         clearTimeout(minuterie)
+        if (minuterieFermeture !== null) {
+          clearTimeout(minuterieFermeture)
+        }
 
         const dureeSecondes = reponse.expires_in ?? 3600
 
@@ -193,8 +206,24 @@ async function demanderJeton(
       },
 
       error_callback: (erreur) => {
+        tracer(`erreur Google : ${erreur.type ?? erreur.message ?? 'inconnue'}`)
         // Ignore notamment un événement de fermeture tardif
         // si le jeton a déjà été reçu.
+        if (erreur.type === 'popup_closed' && !termine) {
+          // La fermeture de la fenêtre peut être signalée avant l'arrivée du jeton
+          // (Google ne peut pas toujours surveiller la fenêtre : politique COOP).
+          // On laisse un court délai au jeton avant de conclure à un abandon.
+          if (minuterieFermeture === null) {
+            minuterieFermeture = setTimeout(() => {
+              terminerAvecErreur(
+                new ErreurAuthentificationGoogle(
+                  'Connexion Google interrompue (popup_closed).',
+                ),
+              )
+            }, DELAI_GRACE_FERMETURE_MS)
+          }
+          return
+        }
         terminerAvecErreur(
           new ErreurAuthentificationGoogle(
             `Connexion Google interrompue (${erreur.type ?? erreur.message ?? 'raison inconnue'}).`,
