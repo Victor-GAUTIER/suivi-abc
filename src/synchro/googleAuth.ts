@@ -125,7 +125,9 @@ async function demanderJeton(invite: 'none' | ''): Promise<JetonMemorise> {
       callback: (reponse) => {
         clearTimeout(minuterie)
         if (reponse.error !== undefined || reponse.access_token === undefined) {
-          rejeter(new ErreurAuthentificationGoogle(reponse.error ?? 'Connexion Google refusée.'))
+          rejeter(
+            new ErreurAuthentificationGoogle(`Connexion Google refusée (${reponse.error ?? 'pas de jeton'}).`),
+          )
           return
         }
         const dureeSecondes = reponse.expires_in ?? 3600
@@ -137,7 +139,9 @@ async function demanderJeton(invite: 'none' | ''): Promise<JetonMemorise> {
       error_callback: (erreur) => {
         clearTimeout(minuterie)
         rejeter(
-          new ErreurAuthentificationGoogle(erreur.type ?? erreur.message ?? 'Connexion Google annulée.'),
+          new ErreurAuthentificationGoogle(
+            `Connexion Google interrompue (${erreur.type ?? erreur.message ?? 'raison inconnue'}).`,
+          ),
         )
       },
     })

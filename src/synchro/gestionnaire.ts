@@ -79,7 +79,8 @@ async function executerSynchro(interactif: boolean): Promise<boolean> {
     } catch (erreur) {
       if (erreur instanceof ErreurAuthentificationGoogle) {
         oublierJetonGoogle()
-        changerEtat({ statut: 'reconnexion_necessaire', messageErreur: '' })
+        // Le message est conservé : lors de la première connexion, c'est la seule trace de la cause.
+        changerEtat({ statut: 'reconnexion_necessaire', messageErreur: erreur.message })
       } else if (erreur instanceof ErreurMotDePasse) {
         changerEtat({ statut: 'erreur', messageErreur: erreur.message })
       } else {

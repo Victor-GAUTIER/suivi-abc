@@ -116,6 +116,7 @@ export function SynchroGoogleDrive() {
         <p className="message-information">
           La connexion à Google a expiré. Appuyez sur « Reconnecter » pour reprendre la
           synchronisation (dernière : {formaterDateSynchro(etat.derniereSynchroLe)}).
+          {etat.messageErreur !== '' && <> Détail : {etat.messageErreur}</>}
         </p>
       )}
       {etat.statut === 'erreur' && <p className="message-erreur">{etat.messageErreur}</p>}
