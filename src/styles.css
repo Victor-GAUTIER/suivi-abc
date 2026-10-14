@@ -1,9 +1,19 @@
 :root {
   --couleur-principale: #440054;
   --couleur-principale-survol: #5d0073;
+  --couleur-barre: #440054;
+  --couleur-barre-survol: #5d0073;
+  --couleur-texte-sur-barre: #e9d5f0;
   --couleur-fond: #f8f9fa;
   --couleur-carte: #ffffff;
   --couleur-bordure: #e2e6ea;
+  --couleur-champ-fond: #ffffff;
+  --couleur-champ-bordure: #ced4da;
+  --couleur-surface-douce: #e9ecef;
+  --couleur-teinte: #f3e8f6;
+  --couleur-teinte-forte: #e3c9ea;
+  --couleur-info-fond: #e8f5e9;
+  --couleur-info-texte: #1b5e20;
   --couleur-texte: #343a40;
   --couleur-texte-doux: #6c757d;
   --couleur-succes: #28a745;
@@ -11,6 +21,80 @@
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
   color: var(--couleur-texte);
   background-color: var(--couleur-fond);
+  color-scheme: light;
+}
+
+/* Thèmes : seules les variables changent. Le thème « violet » est celui de :root. */
+:root[data-theme='ocean'] {
+  --couleur-principale: #0b4f8a;
+  --couleur-principale-survol: #1366b0;
+  --couleur-barre: #0b4f8a;
+  --couleur-barre-survol: #1366b0;
+  --couleur-texte-sur-barre: #d6e8f8;
+  --couleur-fond: #f4f8fc;
+  --couleur-bordure: #d8e3ec;
+  --couleur-surface-douce: #e6edf3;
+  --couleur-teinte: #e1eefa;
+  --couleur-teinte-forte: #c9dff5;
+}
+
+:root[data-theme='foret'] {
+  --couleur-principale: #1f5c3a;
+  --couleur-principale-survol: #2a7a4e;
+  --couleur-barre: #1f5c3a;
+  --couleur-barre-survol: #2a7a4e;
+  --couleur-texte-sur-barre: #d5ecdc;
+  --couleur-fond: #f5faf6;
+  --couleur-bordure: #d9e5dc;
+  --couleur-surface-douce: #e6eee8;
+  --couleur-teinte: #e2f1e7;
+  --couleur-teinte-forte: #c9e3d3;
+  --couleur-succes: #2e7d32;
+}
+
+:root[data-theme='sombre'] {
+  --couleur-principale: #d2a8e6;
+  --couleur-principale-survol: #e0bff0;
+  --couleur-barre: #2a1236;
+  --couleur-barre-survol: #3b1b4d;
+  --couleur-texte-sur-barre: #d9c3e3;
+  --couleur-fond: #14111a;
+  --couleur-carte: #1f1b27;
+  --couleur-bordure: #3a3346;
+  --couleur-champ-fond: #2a2433;
+  --couleur-champ-bordure: #4a4257;
+  --couleur-surface-douce: #2a2433;
+  --couleur-teinte: #3a2a47;
+  --couleur-teinte-forte: #4d3660;
+  --couleur-info-fond: #1d3a26;
+  --couleur-info-texte: #b9e6c4;
+  --couleur-texte: #ece8f1;
+  --couleur-texte-doux: #a69fb3;
+  --couleur-succes: #2b8a3e;
+  --couleur-danger: #d64555;
+  color-scheme: dark;
+}
+
+:root[data-theme='contraste'] {
+  --couleur-principale: #0000a0;
+  --couleur-principale-survol: #0000d0;
+  --couleur-barre: #000000;
+  --couleur-barre-survol: #2b2b2b;
+  --couleur-texte-sur-barre: #ffffff;
+  --couleur-fond: #ffffff;
+  --couleur-carte: #ffffff;
+  --couleur-bordure: #000000;
+  --couleur-champ-fond: #ffffff;
+  --couleur-champ-bordure: #000000;
+  --couleur-surface-douce: #e6e6e6;
+  --couleur-teinte: #dde0ff;
+  --couleur-teinte-forte: #bcc2ff;
+  --couleur-info-fond: #ffffff;
+  --couleur-info-texte: #000000;
+  --couleur-texte: #000000;
+  --couleur-texte-doux: #333333;
+  --couleur-succes: #006400;
+  --couleur-danger: #a00000;
 }
 
 * {
@@ -57,7 +141,7 @@ h3 {
 }
 
 .barre-laterale {
-  background-color: var(--couleur-principale);
+  background-color: var(--couleur-barre);
   color: #ffffff;
 }
 
@@ -92,7 +176,7 @@ h3 {
   min-height: 2.5rem;
   border: none;
   border-radius: 6px;
-  background-color: var(--couleur-principale-survol);
+  background-color: var(--couleur-barre-survol);
   color: #ffffff;
   font-size: 1.25rem;
   cursor: pointer;
@@ -177,11 +261,12 @@ input,
 select,
 textarea {
   padding: 0.6rem;
-  border: 1px solid #ced4da;
+  border: 1px solid var(--couleur-champ-bordure);
   border-radius: 6px;
   font: inherit;
   font-weight: 400;
-  background-color: #ffffff;
+  background-color: var(--couleur-champ-fond);
+  color: var(--couleur-texte);
 }
 
 input[type='color'] {
@@ -235,7 +320,7 @@ button {
 }
 
 .bouton-secondaire {
-  background-color: #ffffff;
+  background-color: var(--couleur-carte);
   border-color: var(--couleur-principale);
   color: var(--couleur-principale);
 }
@@ -253,8 +338,8 @@ button {
 .message-information {
   padding: 0.6rem 0.8rem;
   border-radius: 6px;
-  background-color: #e8f5e9;
-  color: #1b5e20;
+  background-color: var(--couleur-info-fond);
+  color: var(--couleur-info-texte);
 }
 
 .texte-vide,
@@ -358,7 +443,7 @@ button {
 }
 
 .calendrier-jour-hors-mois {
-  background-color: #e9ecef;
+  background-color: var(--couleur-surface-douce);
   color: var(--couleur-texte-doux);
 }
 
@@ -436,7 +521,7 @@ button {
 .barre-piste {
   height: 1rem;
   border-radius: 4px;
-  background-color: #eceff1;
+  background-color: var(--couleur-surface-douce);
 }
 
 .barre-remplissage {
@@ -575,19 +660,19 @@ button {
     min-height: 3rem;
     padding: 0 1.25rem;
     border-left: 4px solid transparent;
-    color: #e9d5f0;
+    color: var(--couleur-texte-sur-barre);
     font-size: 1rem;
     text-align: left;
   }
 
   .onglet:hover {
-    background-color: var(--couleur-principale-survol);
+    background-color: var(--couleur-barre-survol);
   }
 
   .onglet-actif,
   .onglet-actif:hover {
     border-left-color: #ffffff;
-    background-color: var(--couleur-principale-survol);
+    background-color: var(--couleur-barre-survol);
     color: #ffffff;
   }
 
@@ -659,7 +744,7 @@ button {
   gap: 0.35rem;
   padding: 0.15rem 0.2rem 0.15rem 0.6rem;
   border-radius: 999px;
-  background-color: #f3e8f6;
+  background-color: var(--couleur-teinte);
   color: var(--couleur-principale);
   font-size: 0.85rem;
   font-weight: 600;
@@ -678,7 +763,7 @@ button {
 }
 
 .pastille button:hover {
-  background-color: #e3c9ea;
+  background-color: var(--couleur-teinte-forte);
 }
 
 /* Synchronisation Google Drive */
@@ -710,5 +795,57 @@ button:disabled {
   justify-content: space-between;
   gap: 0.5rem;
   padding: 0.4rem 0;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--couleur-bordure);
+}
+
+/* Choix du thème (Paramètres) */
+.choix-themes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.choix-theme {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.6rem;
+  border: 2px solid var(--couleur-bordure);
+  border-radius: 8px;
+  background-color: var(--couleur-carte);
+  cursor: pointer;
+}
+
+.choix-theme:has(input:checked) {
+  border-color: var(--couleur-principale);
+}
+
+.choix-theme:has(input:focus-visible) {
+  outline: 2px solid var(--couleur-principale);
+  outline-offset: 2px;
+}
+
+.choix-theme input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.choix-theme-apercu {
+  display: flex;
+  height: 1.6rem;
+  overflow: hidden;
+  border: 1px solid var(--couleur-bordure);
+  border-radius: 4px;
+}
+
+.choix-theme-apercu span {
+  flex: 1;
+}
+
+.choix-theme-nom {
+  font-weight: 600;
 }

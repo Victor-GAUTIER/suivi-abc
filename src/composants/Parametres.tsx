@@ -22,6 +22,8 @@ import {
 import { telechargerTexte } from '../telechargement'
 import { PartageProfils } from './PartageProfils'
 import { SynchroGoogleDrive } from './SynchroGoogleDrive'
+import { THEMES, appliquerTheme, lireThemeMemorise } from '../themes'
+import type { IdentifiantTheme } from '../themes'
 import type { EnveloppeChiffree, EntreeABC, Profil, TypeComportement } from '../types'
 
 interface ProprietesParametres {
@@ -42,6 +44,7 @@ export function Parametres({
   onAuteurChange,
 }: ProprietesParametres) {
   const [nomNouveauType, setNomNouveauType] = useState('')
+  const [themeChoisi, setThemeChoisi] = useState<IdentifiantTheme>(lireThemeMemorise)
   const [couleurNouveauType, setCouleurNouveauType] = useState('#6366f1')
   const [motDePasseExport, setMotDePasseExport] = useState('')
   const [enveloppeEnAttente, setEnveloppeEnAttente] = useState<EnveloppeChiffree | null>(null)
@@ -181,6 +184,34 @@ export function Parametres({
           onChange={(evenement) => onAuteurChange(evenement.target.value)}
           onBlur={(evenement) => enregistrerAuteur(evenement.target.value)}
         />
+      </section>
+
+      <section className="carte-statistique">
+        <h3>Apparence</h3>
+        <fieldset className="choix-themes">
+          <legend className="visuellement-cache">Thème de couleurs</legend>
+          {THEMES.map((theme) => (
+            <label key={theme.identifiant} className="choix-theme">
+              <input
+                type="radio"
+                name="theme"
+                value={theme.identifiant}
+                checked={themeChoisi === theme.identifiant}
+                onChange={() => {
+                  setThemeChoisi(theme.identifiant)
+                  appliquerTheme(theme.identifiant)
+                }}
+              />
+              <span className="choix-theme-apercu" aria-hidden="true">
+                {theme.apercu.map((couleur) => (
+                  <span key={couleur} style={{ backgroundColor: couleur }} />
+                ))}
+              </span>
+              <span className="choix-theme-nom">{theme.libelle}</span>
+            </label>
+          ))}
+        </fieldset>
+        <p className="texte-aide">Ce réglage reste sur cet appareil.</p>
       </section>
 
       <section className="carte-statistique">
