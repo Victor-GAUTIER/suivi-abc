@@ -12,8 +12,8 @@ import {
 import { StockageGoogleDrive } from './googleDrive'
 import {
   doitUtiliserRedirection,
-  memoriserConnexionEnAttente,
-  recupererConnexionEnAttente,
+  memoriserActionEnAttente,
+  recupererActionEnAttente,
 } from './redirectionGoogle'
 import { synchroniser } from './moteur'
 import { ErreurAuthentificationGoogle, ErreurMotDePasse } from './types'
@@ -177,7 +177,8 @@ export async function initialiserSynchro(): Promise<void> {
   }
 
   // Retour de Google après une connexion par redirection (iPhone) : on reprend là où on s'était arrêté.
-  const motDePasseEnAttente = recupererConnexionEnAttente()
+  const reprise = recupererActionEnAttente('synchro')
+  const motDePasseEnAttente = reprise?.motDePasse ?? null
   const erreurRedirection = lireErreurRetourRedirection()
   if (motDePasseEnAttente !== null) {
     if (erreurRedirection !== '' || !unJetonEstMemorise()) {
@@ -187,9 +188,6 @@ export async function initialiserSynchro(): Promise<void> {
     }
     await connecterGoogleDrive(motDePasseEnAttente)
     return
-  }
-  if (erreurRedirection !== '') {
-    changerEtat({ messageErreur: erreurRedirection })
   }
   if (active === 'oui' && motDePasse !== undefined && motDePasse !== '') {
     prechargerBibliothequeGoogle()
@@ -206,9 +204,11 @@ export async function connecterGoogleDrive(motDePasse: string): Promise<boolean>
   motDePasseActif = motDePasse
   if (doitUtiliserRedirection()) {
     // La page va quitter l'application pour Google puis revenir : le mot de passe est gardé le temps de l'aller-retour.
-    memoriserConnexionEnAttente(motDePasse)
+    memoriserActionEnAttente('synchro', motDePasse)
   }
   const reussite = await executerSynchro(true)
+  // Si la page n'a pas quitté l'application (jeton déjà valable), l'attente n'a plus lieu d'être.
+  recupererActionEnAttente('synchro')
   if (!reussite) {
     motDePasseActif = ''
     changerEtat({ statut: 'inactive' })

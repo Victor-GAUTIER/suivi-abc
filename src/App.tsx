@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
 import type { FormEvent } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { baseSuiviABC } from './db'
@@ -12,12 +12,14 @@ import {
 } from './depot'
 import { Calendrier } from './composants/Calendrier'
 import { Icone } from './composants/Icones'
+import { InvitationProfil } from './composants/InvitationProfil'
 import { FormulaireEntree } from './composants/FormulaireEntree'
 import { Journal } from './composants/Journal'
 import { Parametres } from './composants/Parametres'
+import { RejoindreProfilPartage } from './composants/RejoindreProfilPartage'
 import { Statistiques } from './composants/Statistiques'
 import { extraireListesConnues } from './listes'
-import { initialiserPartage } from './partage/gestionnairePartage'
+import { abonnerEtatPartage, initialiserPartage, lireEtatPartage } from './partage/gestionnairePartage'
 import { initialiserSynchro } from './synchro/gestionnaire'
 import { SynchroGoogleDrive } from './composants/SynchroGoogleDrive'
 import type { EntreeABC, TypeComportement } from './types'
@@ -39,6 +41,8 @@ export function App() {
   const [entreeEnEdition, setEntreeEnEdition] = useState<EntreeABC | null>(null)
   const [codeNouveauProfil, setCodeNouveauProfil] = useState('')
   const [initialisationTerminee, setInitialisationTerminee] = useState(false)
+
+  const etatPartage = useSyncExternalStore(abonnerEtatPartage, lireEtatPartage)
 
   const profils = useLiveQuery(
     () => baseSuiviABC.profils.filter((profil) => !profil.supprime).toArray(),
@@ -92,6 +96,15 @@ export function App() {
     }
   }, [initialisationTerminee, profils, profilActifId])
 
+  // Après « rejoindre un profil » (lien d'invitation compris), l'application s'ouvre sur ce profil.
+  useEffect(() => {
+    if (etatPartage.profilRejointId !== '' && profils?.some((profil) => profil.id === etatPartage.profilRejointId)) {
+      void changerProfilActif(etatPartage.profilRejointId)
+    }
+    // changerProfilActif ne change pas de comportement entre deux affichages.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [etatPartage.profilRejointId, profils])
+
   const typesParIdentifiant = new Map<string, TypeComportement>()
   for (const typeComportement of typesTousConfondus ?? []) {
     typesParIdentifiant.set(typeComportement.id, typeComportement)
@@ -139,6 +152,7 @@ export function App() {
     return (
       <main className="contenu contenu-accueil">
         <h1>Suivi ABC</h1>
+        <InvitationProfil />
         <p>
           Créez le premier profil. Utilisez un code ou des initiales plutôt qu'un nom complet.
         </p>
@@ -159,6 +173,10 @@ export function App() {
         <section className="carte-statistique accueil-synchro">
           <h2>Déjà utilisé sur un autre appareil ?</h2>
           <SynchroGoogleDrive />
+        </section>
+        <section className="carte-statistique accueil-synchro">
+          <h2>Un profil a été partagé avec vous ?</h2>
+          <RejoindreProfilPartage surEcranAccueil />
         </section>
         <p className="texte-aide">
           Vous avez déjà une sauvegarde ? Créez un profil provisoire, puis importez le fichier dans
@@ -233,6 +251,7 @@ export function App() {
       </aside>
 
       <main className="contenu">
+        <InvitationProfil />
         <h2 className="titre-page">{titrePage}</h2>
         {ongletActif === 'saisie' && (
           <FormulaireEntree

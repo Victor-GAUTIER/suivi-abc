@@ -2,8 +2,20 @@ import { ecrireParametre, lireParametre } from '../depot'
 import { maintenantHorodatage } from '../dates'
 import { serialiserSauvegarde } from '../sauvegarde'
 import { creerDepotLocalPourProfil, ecouterModificationsLocales } from '../synchro/depotLocal'
-import { obtenirJetonGoogle, oublierJetonGoogle, synchroGoogleEstConfiguree } from '../synchro/googleAuth'
+import {
+  lireErreurRetourRedirection,
+  obtenirJetonGoogle,
+  oublierJetonGoogle,
+  synchroGoogleEstConfiguree,
+  unJetonEstMemorise,
+} from '../synchro/googleAuth'
+import {
+  doitUtiliserRedirection,
+  memoriserActionEnAttente,
+  recupererActionEnAttente,
+} from '../synchro/redirectionGoogle'
 import { creerFichierDrive, StockageFichierDrive } from '../synchro/googleDrive'
+import { oublierInvitation } from './invitation'
 import { lireSauvegardeDistante, synchroniser } from '../synchro/moteur'
 import {
   ErreurAccesFichierDrive,
@@ -43,9 +55,14 @@ export interface EtatPartageProfil {
 export interface EtatPartage {
   configurations: ConfigurationPartage[]
   parProfil: Record<string, EtatPartageProfil>
+  // Résultat d'un « rejoindre un profil » repris après le retour de Google (iPhone).
+  messageReprise: string
+  erreurReprise: string
+  // Dernier profil ajouté par « rejoindre » : l'application s'ouvre dessus.
+  profilRejointId: string
 }
 
-let etatCourant: EtatPartage = { configurations: [], parProfil: {} }
+let etatCourant: EtatPartage = { configurations: [], parProfil: {}, messageReprise: '', erreurReprise: '', profilRejointId: '' }
 const ecouteursEtat = new Set<() => void>()
 
 function changerEtat(nouvelEtat: EtatPartage): void {
@@ -245,7 +262,29 @@ export async function initialiserPartage(): Promise<void> {
     await lireParametre(CLE_CONFIGURATIONS_PARTAGE),
   )
   changerEtat({ ...etatCourant, configurations })
-  if (configurations.length > 0) {
+
+  // Retour de Google après « rejoindre un profil » sur iPhone : on ouvre le sélecteur de fichiers.
+  const reprise = recupererActionEnAttente('rejoindre')
+  if (reprise !== null) {
+    const erreurRedirection = lireErreurRetourRedirection()
+    if (erreurRedirection !== '' || !unJetonEstMemorise()) {
+      changerEtat({
+        ...etatCourant,
+        erreurReprise: erreurRedirection !== '' ? erreurRedirection : 'La connexion à Google a échoué.',
+      })
+    } else {
+      try {
+        const profilId = await rejoindrePartage(reprise.motDePasse, reprise.identifiantFichier)
+        if (profilId !== null) {
+          changerEtat({ ...etatCourant, messageReprise: 'Profil ajouté.' })
+        }
+      } catch (erreur) {
+        changerEtat({ ...etatCourant, erreurReprise: messageErreurLisible(erreur) })
+      }
+    }
+  }
+
+  if (etatCourant.configurations.length > 0) {
     installerDeclencheurs()
     void synchroniserProfilsPartages(false)
   }
@@ -281,11 +320,25 @@ export async function activerPartage(
 
 // Choisit un fichier de profil dans Drive (sélecteur Google), le déchiffre et l'ajoute à l'appareil.
 // Renvoie l'identifiant du profil ajouté, ou null si l'utilisateur a fermé le sélecteur.
-export async function rejoindrePartage(motDePasse: string): Promise<string | null> {
+// identifiantFichierAttendu : fichier du lien d'invitation (le sélecteur ne propose que celui-là).
+export async function rejoindrePartage(
+  motDePasse: string,
+  identifiantFichierAttendu: string | null = null,
+): Promise<string | null> {
   const jeton = () => obtenirJetonGoogle(true)
-  const fichier = await choisirFichierDrive(await jeton())
+  if (doitUtiliserRedirection() && !unJetonEstMemorise()) {
+    // iPhone : la page va partir chez Google puis revenir ; le mot de passe est gardé pour la reprise.
+    memoriserActionEnAttente('rejoindre', motDePasse, identifiantFichierAttendu)
+  }
+  const jetonObtenu = await jeton()
+  // La page n'a pas quitté l'application : aucune reprise à prévoir.
+  recupererActionEnAttente('rejoindre')
+  const fichier = await choisirFichierDrive(jetonObtenu, identifiantFichierAttendu)
   if (fichier === null) {
     return null
+  }
+  if (identifiantFichierAttendu !== null && fichier.identifiant !== identifiantFichierAttendu) {
+    throw new Error("Ce n'est pas le fichier de l'invitation. Choisissez le fichier proposé.")
   }
   const stockage = new StockageFichierDrive(fichier.identifiant, jeton)
   const contenu = await stockage.lire()
@@ -307,6 +360,8 @@ export async function rejoindrePartage(motDePasse: string): Promise<string | nul
   ])
   installerDeclencheurs()
   await synchroniserProfilsPartages(true)
+  oublierInvitation()
+  changerEtat({ ...etatCourant, profilRejointId: profilId })
   return profilId
 }
 

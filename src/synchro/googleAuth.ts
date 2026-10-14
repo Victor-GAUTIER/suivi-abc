@@ -79,10 +79,9 @@ export function unJetonEstMemorise(): boolean {
   return jetonMemorise !== null && jetonMemorise.expireLe > Date.now()
 }
 
+// Non consommé : la synchro personnelle et le partage de profils peuvent chacun le lire au démarrage.
 export function lireErreurRetourRedirection(): string {
-  const message = erreurRetourRedirection
-  erreurRetourRedirection = ''
-  return message
+  return erreurRetourRedirection
 }
 
 let demandeJetonEnCours: {

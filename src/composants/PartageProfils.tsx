@@ -8,14 +8,16 @@ import {
   lireDroitsPartage,
   lireEtatPartage,
   listerAccesPartage,
-  rejoindrePartage,
   retirerAccesPartage,
   synchroniserPartageMaintenant,
 } from '../partage/gestionnairePartage'
+import { construireLienInvitation } from '../partage/invitation'
 import { LIBELLES_ROLES } from '../partage/permissions'
 import type { DroitsSurFichier, PersonneAvecAcces, RolePartage } from '../partage/permissions'
 import { prechargerBibliothequeGoogle, synchroGoogleEstConfiguree } from '../synchro/googleAuth'
 import type { Profil } from '../types'
+import { adresseDeRetour } from '../synchro/redirectionGoogle'
+import { RejoindreProfilPartage } from './RejoindreProfilPartage'
 
 interface ProprietesPartageProfils {
   profils: Profil[]
@@ -45,7 +47,6 @@ export function PartageProfils({ profils, profilActifId }: ProprietesPartageProf
 
   const [motDePasse, setMotDePasse] = useState('')
   const [confirmationMotDePasse, setConfirmationMotDePasse] = useState('')
-  const [motDePasseRejoindre, setMotDePasseRejoindre] = useState('')
   const [adresseInvitee, setAdresseInvitee] = useState('')
   const [roleInvite, setRoleInvite] = useState<RolePartage>('writer')
   const [droits, setDroits] = useState<DroitsSurFichier | null>(null)
@@ -125,6 +126,24 @@ export function PartageProfils({ profils, profilActifId }: ProprietesPartageProf
     return true
   }
 
+  const lienInvitation =
+    configurationActive === undefined || profilActif === undefined
+      ? ''
+      : construireLienInvitation(
+          adresseDeRetour(location.origin, location.pathname),
+          configurationActive.identifiantFichier,
+          profilActif.code,
+        )
+
+  async function copierLienInvitation() {
+    try {
+      await navigator.clipboard.writeText(lienInvitation)
+      setMessage("Lien copié. N'oubliez pas de transmettre aussi le mot de passe du profil.")
+    } catch {
+      setMessageErreur('Copie impossible : sélectionnez le lien et copiez-le à la main.')
+    }
+  }
+
   async function gererActivation(evenement: FormEvent<HTMLFormElement>) {
     evenement.preventDefault()
     if (profilActif === undefined) {
@@ -154,21 +173,6 @@ export function PartageProfils({ profils, profilActifId }: ProprietesPartageProf
         "Invitation envoyée par Google. Communiquez aussi le mot de passe du profil à cette personne (par un autre moyen que l'e-mail).",
       )
       await chargerAcces()
-    })
-  }
-
-  async function gererRejoindre(evenement: FormEvent<HTMLFormElement>) {
-    evenement.preventDefault()
-    if (motDePasseRejoindre === '') {
-      setMessageErreur('Saisissez le mot de passe du profil partagé.')
-      return
-    }
-    await executer(async () => {
-      const profilId = await rejoindrePartage(motDePasseRejoindre)
-      if (profilId !== null) {
-        setMotDePasseRejoindre('')
-        setMessage('Profil ajouté. Sélectionnez-le dans la liste des profils (menu de gauche).')
-      }
     })
   }
 
@@ -268,6 +272,31 @@ export function PartageProfils({ profils, profilActifId }: ProprietesPartageProf
             </button>
           </div>
 
+          <div className="lien-invitation">
+            <h4>Lien d'invitation</h4>
+            <p className="texte-aide">
+              Envoyez ce lien à la personne invitée : il ouvre l'application sur ce profil. Elle
+              doit aussi connaître le mot de passe du profil, à lui donner séparément (le lien ne le
+              contient pas). Pensez à l'inviter plus bas avec son adresse Google.
+            </p>
+            <input
+              type="text"
+              readOnly
+              value={lienInvitation}
+              aria-label="Lien d'invitation"
+              onFocus={(evenement) => evenement.target.select()}
+            />
+            <div className="formulaire-actions">
+              <button
+                type="button"
+                className="bouton-secondaire"
+                onClick={() => void copierLienInvitation()}
+              >
+                Copier le lien
+              </button>
+            </div>
+          </div>
+
           {droits !== null && (
             <div>
               {droits.peutPartager ? (
@@ -344,27 +373,7 @@ export function PartageProfils({ profils, profilActifId }: ProprietesPartageProf
         </div>
       )}
 
-      <form className="formulaire formulaire-sans-cadre" onSubmit={gererRejoindre}>
-        <h4>Ajouter un profil partagé avec moi</h4>
-        <label>
-          Mot de passe du profil partagé
-          <input
-            type="password"
-            autoComplete="off"
-            value={motDePasseRejoindre}
-            onChange={(evenement) => setMotDePasseRejoindre(evenement.target.value)}
-          />
-        </label>
-        <p className="texte-aide">
-          Après avoir saisi le mot de passe, choisissez le fichier « Suivi ABC - profil … » dans la
-          fenêtre Google (onglet « Partagés avec moi »).
-        </p>
-        <div className="formulaire-actions">
-          <button type="submit" className="bouton-secondaire" disabled={occupe}>
-            Choisir le fichier dans Google Drive
-          </button>
-        </div>
-      </form>
+      <RejoindreProfilPartage />
 
       {message !== '' && <p className="message-information">{message}</p>}
       {messageErreur !== '' && <p className="message-erreur">{messageErreur}</p>}

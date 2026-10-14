@@ -16,6 +16,7 @@ interface VueSelecteur {
   setMimeTypes: (types: string) => VueSelecteur
   setOwnedByMe: (proprietaire: boolean) => VueSelecteur
   setLabel?: (libelle: string) => VueSelecteur
+  setFileIds?: (identifiants: string) => VueSelecteur
 }
 
 interface ConstructeurSelecteur {
@@ -80,7 +81,11 @@ export interface FichierChoisi {
 
 // Ouvre le sélecteur de fichiers Google. Choisir un fichier donne à l'application l'accès à ce
 // seul fichier (portée « drive.file »). Renvoie null si l'utilisateur ferme la fenêtre.
-export async function choisirFichierDrive(jeton: string): Promise<FichierChoisi | null> {
+// Avec identifiantFichier (lien d'invitation), la fenêtre ne propose que ce fichier.
+export async function choisirFichierDrive(
+  jeton: string,
+  identifiantFichier: string | null = null,
+): Promise<FichierChoisi | null> {
   if (!selecteurGoogleEstConfigure()) {
     throw new Error(
       "Le sélecteur de fichiers Google n'est pas configuré dans cette version (clé d'API manquante).",
@@ -89,15 +94,20 @@ export async function choisirFichierDrive(jeton: string): Promise<FichierChoisi 
   await chargerSelecteurGoogle()
   const picker = lireBibliothequeSelecteur()
   return new Promise<FichierChoisi | null>((resoudre) => {
-    const vueMesFichiers = new picker.DocsView().setMimeTypes('application/json')
-    const vuePartages = new picker.DocsView().setMimeTypes('application/json').setOwnedByMe(false)
-    const selecteur = new picker.PickerBuilder()
+    const constructeur = new picker.PickerBuilder()
       .setOAuthToken(jeton)
       .setDeveloperKey(cleApiGoogle)
       .setAppId(numeroProjetGoogle())
       .setLocale('fr')
-      .addView(vueMesFichiers)
-      .addView(vuePartages)
+    const vueDuFichier = new picker.DocsView()
+    if (identifiantFichier !== null && vueDuFichier.setFileIds !== undefined) {
+      constructeur.addView(vueDuFichier.setFileIds(identifiantFichier))
+    } else {
+      constructeur
+        .addView(new picker.DocsView().setMimeTypes('application/json'))
+        .addView(new picker.DocsView().setMimeTypes('application/json').setOwnedByMe(false))
+    }
+    const selecteur = constructeur
       .setCallback((donnees) => {
         if (donnees.action === 'picked' && donnees.docs !== undefined && donnees.docs.length > 0) {
           const document = donnees.docs[0]

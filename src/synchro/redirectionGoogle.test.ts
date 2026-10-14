@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   adresseDeRetour,
   analyserRetourRedirection,
@@ -89,5 +89,31 @@ describe('analyserRetourRedirection', () => {
   it('remplace une durée invalide par une heure', () => {
     const retour = analyserRetourRedirection('#access_token=abc&expires_in=oups&state=e1', '', 'e1')
     expect(retour).toEqual({ type: 'jeton', jeton: 'abc', dureeSecondes: 3600 })
+  })
+})
+
+describe('actions en attente', () => {
+  it('rend le mot de passe une seule fois, par action', async () => {
+    const memoire = new Map<string, string>()
+    vi.stubGlobal('sessionStorage', {
+      getItem: (cle: string) => memoire.get(cle) ?? null,
+      setItem: (cle: string, valeur: string) => void memoire.set(cle, valeur),
+      removeItem: (cle: string) => void memoire.delete(cle),
+    })
+    const { memoriserActionEnAttente, recupererActionEnAttente } = await import('./redirectionGoogle')
+
+    memoriserActionEnAttente('rejoindre', 'secret-1', 'fichier-1')
+    memoriserActionEnAttente('synchro', 'secret-2')
+    expect(recupererActionEnAttente('rejoindre')).toEqual({
+      motDePasse: 'secret-1',
+      identifiantFichier: 'fichier-1',
+    })
+    expect(recupererActionEnAttente('rejoindre')).toBeNull()
+    expect(recupererActionEnAttente('synchro')).toEqual({
+      motDePasse: 'secret-2',
+      identifiantFichier: null,
+    })
+
+    vi.unstubAllGlobals()
   })
 })

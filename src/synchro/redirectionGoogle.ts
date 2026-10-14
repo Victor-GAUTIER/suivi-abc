@@ -3,7 +3,10 @@
 // ce qui laisse une page blanche (accounts.google.com/gsi/transform).
 
 const CLE_ETAT_OAUTH = 'suiviAbcEtatOauth'
-const CLE_CONNEXION_EN_ATTENTE = 'suiviAbcConnexionEnAttente'
+const PREFIXE_ACTION_EN_ATTENTE = 'suiviAbcActionEnAttente-'
+
+// Actions qui commencent par un mot de passe saisi, puis reprennent après le retour de Google.
+export type ActionEnAttente = 'synchro' | 'rejoindre'
 
 export type RetourRedirection =
   | { type: 'aucun' }
@@ -132,23 +135,44 @@ export function lireRetourRedirectionDansLaPage(): RetourRedirection {
   return retour
 }
 
-// Le mot de passe de chiffrement saisi avant la redirection est gardé le temps de l'aller-retour
-// (onglet courant uniquement), puis supprimé dès la lecture.
-export function memoriserConnexionEnAttente(motDePasse: string): void {
-  ecrireSession(CLE_CONNEXION_EN_ATTENTE, JSON.stringify({ motDePasse }))
+// Le mot de passe saisi avant la redirection (et, pour une invitation, le fichier visé) est gardé
+// le temps de l'aller-retour (onglet courant uniquement), puis supprimé dès la lecture.
+export interface ActionReprise {
+  motDePasse: string
+  identifiantFichier: string | null
 }
 
-export function recupererConnexionEnAttente(): string | null {
-  const brut = lireSession(CLE_CONNEXION_EN_ATTENTE)
-  ecrireSession(CLE_CONNEXION_EN_ATTENTE, null)
+export function memoriserActionEnAttente(
+  action: ActionEnAttente,
+  motDePasse: string,
+  identifiantFichier: string | null = null,
+): void {
+  ecrireSession(
+    PREFIXE_ACTION_EN_ATTENTE + action,
+    JSON.stringify({ motDePasse, identifiantFichier }),
+  )
+}
+
+// Lit et supprime l'action en attente. Renvoie null s'il n'y en a pas.
+export function recupererActionEnAttente(action: ActionEnAttente): ActionReprise | null {
+  const cle = PREFIXE_ACTION_EN_ATTENTE + action
+  const brut = lireSession(cle)
+  ecrireSession(cle, null)
   if (brut === null) {
     return null
   }
   try {
-    const contenu = JSON.parse(brut) as { motDePasse?: unknown }
-    return typeof contenu.motDePasse === 'string' && contenu.motDePasse !== ''
-      ? contenu.motDePasse
-      : null
+    const contenu = JSON.parse(brut) as { motDePasse?: unknown; identifiantFichier?: unknown }
+    if (typeof contenu.motDePasse !== 'string' || contenu.motDePasse === '') {
+      return null
+    }
+    return {
+      motDePasse: contenu.motDePasse,
+      identifiantFichier:
+        typeof contenu.identifiantFichier === 'string' && contenu.identifiantFichier !== ''
+          ? contenu.identifiantFichier
+          : null,
+    }
   } catch {
     return null
   }
