@@ -1,13 +1,20 @@
 import { ecrireParametre, lireParametre } from '../depot'
 import { depotLocalDexie, ecouterModificationsLocales } from './depotLocal'
 import {
+  lireErreurRetourRedirection,
   obtenirJetonGoogle,
   oublierJetonGoogle,
   prechargerBibliothequeGoogle,
   revoquerJetonGoogle,
   synchroGoogleEstConfiguree,
+  unJetonEstMemorise,
 } from './googleAuth'
 import { StockageGoogleDrive } from './googleDrive'
+import {
+  doitUtiliserRedirection,
+  memoriserConnexionEnAttente,
+  recupererConnexionEnAttente,
+} from './redirectionGoogle'
 import { synchroniser } from './moteur'
 import { ErreurAuthentificationGoogle, ErreurMotDePasse } from './types'
 
@@ -168,6 +175,22 @@ export async function initialiserSynchro(): Promise<void> {
   if (derniereSynchro !== undefined) {
     changerEtat({ derniereSynchroLe: derniereSynchro })
   }
+
+  // Retour de Google après une connexion par redirection (iPhone) : on reprend là où on s'était arrêté.
+  const motDePasseEnAttente = recupererConnexionEnAttente()
+  const erreurRedirection = lireErreurRetourRedirection()
+  if (motDePasseEnAttente !== null) {
+    if (erreurRedirection !== '' || !unJetonEstMemorise()) {
+      // Refus ou échec chez Google : on n'insiste pas, sinon la page repartirait chez Google en boucle.
+      changerEtat({ statut: 'inactive', messageErreur: erreurRedirection })
+      return
+    }
+    await connecterGoogleDrive(motDePasseEnAttente)
+    return
+  }
+  if (erreurRedirection !== '') {
+    changerEtat({ messageErreur: erreurRedirection })
+  }
   if (active === 'oui' && motDePasse !== undefined && motDePasse !== '') {
     prechargerBibliothequeGoogle()
     synchroActive = true
@@ -181,6 +204,10 @@ export async function initialiserSynchro(): Promise<void> {
 // Première connexion : doit être appelée depuis un clic (fenêtre de connexion Google).
 export async function connecterGoogleDrive(motDePasse: string): Promise<boolean> {
   motDePasseActif = motDePasse
+  if (doitUtiliserRedirection()) {
+    // La page va quitter l'application pour Google puis revenir : le mot de passe est gardé le temps de l'aller-retour.
+    memoriserConnexionEnAttente(motDePasse)
+  }
   const reussite = await executerSynchro(true)
   if (!reussite) {
     motDePasseActif = ''

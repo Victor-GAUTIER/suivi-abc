@@ -1,3 +1,8 @@
+import {
+  demarrerRedirectionGoogle,
+  doitUtiliserRedirection,
+  lireRetourRedirectionDansLaPage,
+} from './redirectionGoogle'
 import { ErreurAuthentificationGoogle } from './types'
 
 const URL_BIBLIOTHEQUE_GOOGLE = 'https://accounts.google.com/gsi/client'
@@ -56,15 +61,36 @@ interface JetonMemorise {
 
 let jetonMemorise: JetonMemorise | null = null
 
+// Retour d'une connexion par redirection (iPhone) : le jeton est dans l'adresse de la page.
+let erreurRetourRedirection = ''
+
+const retourRedirection = lireRetourRedirectionDansLaPage()
+
+if (retourRedirection.type === 'jeton') {
+  jetonMemorise = {
+    valeur: retourRedirection.jeton,
+    expireLe: Date.now() + retourRedirection.dureeSecondes * 1000,
+  }
+} else if (retourRedirection.type === 'erreur') {
+  erreurRetourRedirection = `Connexion Google refusée (${retourRedirection.message}).`
+}
+
+export function unJetonEstMemorise(): boolean {
+  return jetonMemorise !== null && jetonMemorise.expireLe > Date.now()
+}
+
+export function lireErreurRetourRedirection(): string {
+  const message = erreurRetourRedirection
+  erreurRetourRedirection = ''
+  return message
+}
+
 let demandeJetonEnCours: {
   promesse: Promise<JetonMemorise>
   interactive: boolean
 } | null = null
 
 let chargementBibliotheque: Promise<void> | null = null
-
-// DIAGNOSTIC TEMPORAIRE : numérote les demandes de jeton pour repérer d'éventuelles demandes concurrentes.
-let numeroDemandeDiagnostic = 0
 
 // trim() : une valeur copiée dans une variable GitHub peut contenir un retour à la ligne ou un
 // espace invisible à la fin, ce qui rendrait l'identifiant inconnu de Google.
@@ -154,46 +180,12 @@ async function demanderJeton(
     const tracer = (evenement: string) => {
       console.info(`[Google] ${evenement} (+${Date.now() - debut} ms)`)
     }
-    // DIAGNOSTIC TEMPORAIRE : état de la page autour de la fenêtre Google.
-    const instantane = () => {
-      const activation = (navigator as Navigator & { userActivation?: { isActive: boolean } })
-        .userActivation
-      return `activation=${String(activation?.isActive ?? '?')} focus=${String(document.hasFocus())} visible=${document.visibilityState}`
-    }
-    const evenementsSuivis: Array<[EventTarget, string]> = [
-      [window, 'blur'],
-      [window, 'focus'],
-      [window, 'pagehide'],
-      [window, 'beforeunload'],
-      [document, 'visibilitychange'],
-    ]
-    const surEvenement = (evenement: Event) => tracer(`page : ${evenement.type} — ${instantane()}`)
-    // DIAGNOSTIC TEMPORAIRE : messages reçus par la page pendant la connexion.
-    // Seuls l'origine et la forme du message sont tracés, jamais son contenu (il peut contenir le jeton).
-    const surMessage = (evenement: MessageEvent) => {
-      const donnees: unknown = evenement.data
-      let forme: string = typeof donnees
-      if (typeof donnees === 'string') {
-        forme = `string(${donnees.length} car.)`
-      } else if (donnees !== null && typeof donnees === 'object') {
-        forme = `objet{${Object.keys(donnees as Record<string, unknown>).join(',')}}`
-      }
-      tracer(`message reçu de ${evenement.origin} : ${forme}`)
-    }
-    evenementsSuivis.forEach(([cible, type]) => cible.addEventListener(type, surEvenement))
-    window.addEventListener('message', surMessage)
-    const arreterSuivi = () => {
-      evenementsSuivis.forEach(([cible, type]) => cible.removeEventListener(type, surEvenement))
-      window.removeEventListener('message', surMessage)
-    }
-
     const terminerAvecErreur = (erreur: Error) => {
       if (termine) {
         return
       }
 
       termine = true
-      arreterSuivi()
       clearTimeout(minuterie)
       if (minuterieFermeture !== null) {
         clearTimeout(minuterieFermeture)
@@ -233,8 +225,7 @@ async function demanderJeton(
         }
 
         termine = true
-        arreterSuivi()
-        clearTimeout(minuterie)
+          clearTimeout(minuterie)
         if (minuterieFermeture !== null) {
           clearTimeout(minuterieFermeture)
         }
@@ -248,7 +239,7 @@ async function demanderJeton(
       },
 
       error_callback: (erreur) => {
-        tracer(`erreur Google : ${erreur.type ?? erreur.message ?? 'inconnue'} — ${instantane()}`)
+        tracer(`erreur Google : ${erreur.type ?? erreur.message ?? 'inconnue'}`)
         // Ignore notamment un événement de fermeture tardif
         // si le jeton a déjà été reçu.
         if (erreur.type === 'popup_closed' && !termine) {
@@ -274,12 +265,7 @@ async function demanderJeton(
       },
     })
 
-    numeroDemandeDiagnostic += 1
-    tracer(
-      `demande n°${numeroDemandeDiagnostic} (invite=${invite}) client_id=${identifiantClientGoogle} ` +
-        `longueur=${identifiantClientGoogle.length} portées=${PORTEES_GOOGLE.split(' ').length} ` +
-        `adresse=${location.href} — ${instantane()}`,
-    )
+    tracer(`demande (invite=${invite})`)
     client.requestAccessToken({ prompt: invite })
   })
 }
@@ -296,6 +282,16 @@ export async function obtenirJetonGoogle(
 
   if (jetonEstValable && jetonMemorise !== null) {
     return jetonMemorise.valeur
+  }
+
+  // iPhone/iPad : pas de popup. Connexion par redirection de la page entière.
+  if (doitUtiliserRedirection()) {
+    if (!interactif) {
+      throw new ErreurAuthentificationGoogle('Reconnexion à Google nécessaire.')
+    }
+    demarrerRedirectionGoogle(identifiantClientGoogle, PORTEES_GOOGLE)
+    // La page quitte l'application : cette promesse ne se termine jamais.
+    return new Promise<string>(() => undefined)
   }
 
   // Une demande interactive ne réutilise pas une demande silencieuse.

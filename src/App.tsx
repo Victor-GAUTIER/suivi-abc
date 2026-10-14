@@ -11,6 +11,7 @@ import {
   supprimerEntree,
 } from './depot'
 import { Calendrier } from './composants/Calendrier'
+import { Icone } from './composants/Icones'
 import { FormulaireEntree } from './composants/FormulaireEntree'
 import { Journal } from './composants/Journal'
 import { Parametres } from './composants/Parametres'
@@ -224,7 +225,8 @@ export function App() {
                 setOngletActif(onglet.identifiant)
               }}
             >
-              {onglet.libelle}
+              <Icone nom={onglet.identifiant} />
+              <span className="onglet-libelle">{onglet.libelle}</span>
             </button>
           ))}
         </nav>

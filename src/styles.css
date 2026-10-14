@@ -99,25 +99,40 @@ h3 {
 }
 
 .onglets {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 10;
   display: flex;
-  overflow-x: auto;
-  background-color: var(--couleur-principale-survol);
+  padding-bottom: env(safe-area-inset-bottom);
+  border-top: 1px solid var(--couleur-bordure);
+  background-color: var(--couleur-carte);
 }
 
 .onglet {
+  display: flex;
   flex: 1;
-  min-height: 3rem;
-  padding: 0 0.9rem;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.15rem;
+  min-width: 0;
+  min-height: 3.4rem;
+  padding: 0.35rem 0.2rem;
   border: none;
   background: transparent;
-  color: #e9d5f0;
-  font-size: 0.95rem;
+  color: var(--couleur-texte-doux);
+  font-size: 0.7rem;
   white-space: nowrap;
   cursor: pointer;
 }
 
+.onglet .icone {
+  flex: none;
+}
+
 .onglet-actif {
-  background-color: var(--couleur-fond);
   color: var(--couleur-principale);
   font-weight: 700;
 }
@@ -125,7 +140,8 @@ h3 {
 .contenu {
   flex: 1;
   min-width: 0;
-  padding: 1rem;
+  /* Réserve la place de la barre d'onglets fixée en bas de l'écran. */
+  padding: 1rem 1rem calc(5rem + env(safe-area-inset-bottom));
 }
 
 .titre-page {
@@ -544,16 +560,22 @@ button {
   }
 
   .onglets {
+    position: static;
     flex-direction: column;
-    overflow-x: visible;
     padding: 0.5rem 0;
+    border-top: none;
     background-color: transparent;
   }
 
   .onglet {
     flex: none;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 0.75rem;
+    min-height: 3rem;
     padding: 0 1.25rem;
     border-left: 4px solid transparent;
+    color: #e9d5f0;
     font-size: 1rem;
     text-align: left;
   }
