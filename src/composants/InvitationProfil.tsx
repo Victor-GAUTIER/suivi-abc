@@ -1,17 +1,23 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import type { FormEvent } from 'react'
 import { abonnerEtatPartage, lireEtatPartage, rejoindrePartage } from '../partage/gestionnairePartage'
-import { lireInvitationMemorisee, oublierInvitation } from '../partage/invitation'
+import { oublierInvitation } from '../partage/invitation'
+import type { Invitation } from '../partage/invitation'
 import { prechargerBibliothequeGoogle, synchroGoogleEstConfiguree } from '../synchro/googleAuth'
 
 function lireMessageErreur(erreur: unknown): string {
   return erreur instanceof Error ? erreur.message : "L'opération a échoué."
 }
 
+interface ProprietesInvitationProfil {
+  invitation: Invitation | null
+  // Appelée quand l'invitation n'a plus lieu d'être (ignorée ou déjà utilisée).
+  onOubliee: () => void
+}
+
 // Carte affichée quand l'application a été ouverte depuis un lien d'invitation.
-export function InvitationProfil() {
+export function InvitationProfil({ invitation, onOubliee }: ProprietesInvitationProfil) {
   const etat = useSyncExternalStore(abonnerEtatPartage, lireEtatPartage)
-  const [invitation, setInvitation] = useState(lireInvitationMemorisee)
   const [motDePasse, setMotDePasse] = useState('')
   const [occupe, setOccupe] = useState(false)
   const [messageErreur, setMessageErreur] = useState('')
@@ -31,8 +37,9 @@ export function InvitationProfil() {
   useEffect(() => {
     if (dejaRejoint) {
       oublierInvitation()
+      onOubliee()
     }
-  }, [dejaRejoint])
+  }, [dejaRejoint, onOubliee])
 
   if (invitation === null || dejaRejoint || !synchroGoogleEstConfiguree()) {
     return null
@@ -92,7 +99,7 @@ export function InvitationProfil() {
             disabled={occupe}
             onClick={() => {
               oublierInvitation()
-              setInvitation(null)
+              onOubliee()
             }}
           >
             Ignorer
