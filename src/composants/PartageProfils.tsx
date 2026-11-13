@@ -9,7 +9,6 @@ import {
   lireEtatPartage,
   listerAccesPartage,
   retirerAccesPartage,
-  synchroniserPartageMaintenant,
 } from '../partage/gestionnairePartage'
 import { construireLienInvitation } from '../partage/invitation'
 import { LIBELLES_ROLES } from '../partage/permissions'
@@ -26,13 +25,6 @@ interface ProprietesPartageProfils {
 
 const LONGUEUR_MINIMALE_MOT_DE_PASSE = 8
 
-function formaterDate(dateIso: string | null): string {
-  if (dateIso === null) {
-    return 'jamais'
-  }
-  return new Date(dateIso).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })
-}
-
 function lireMessageErreur(erreur: unknown): string {
   return erreur instanceof Error ? erreur.message : "L'opération a échoué."
 }
@@ -43,7 +35,6 @@ export function PartageProfils({ profils, profilActifId }: ProprietesPartageProf
   const configurationActive = etat.configurations.find(
     (configuration) => configuration.profilId === profilActifId,
   )
-  const etatProfilActif = etat.parProfil[profilActifId]
 
   const [motDePasse, setMotDePasse] = useState('')
   const [confirmationMotDePasse, setConfirmationMotDePasse] = useState('')
@@ -196,7 +187,7 @@ export function PartageProfils({ profils, profilActifId }: ProprietesPartageProf
 
   return (
     <div>
-      <h3>Partage de profils (Google Drive)</h3>
+      <h4>Profils partagés</h4>
       <p className="texte-aide">
         Un profil partagé est un fichier chiffré dans votre Google Drive, que vous partagez avec
         d'autres comptes Google. Les personnes invitées peuvent ajouter ou modifier des saisies,
@@ -243,28 +234,7 @@ export function PartageProfils({ profils, profilActifId }: ProprietesPartageProf
       {profilActif !== undefined && configurationActive !== undefined && (
         <div>
           <h4>Profil « {profilActif.code} » partagé</h4>
-          {(etatProfilActif === undefined || etatProfilActif.statut === 'repos') && (
-            <p>Dernière synchronisation : {formaterDate(etatProfilActif?.derniereSynchroLe ?? null)}.</p>
-          )}
-          {etatProfilActif?.statut === 'en_cours' && <p>Synchronisation en cours…</p>}
-          {etatProfilActif?.statut === 'reconnexion_necessaire' && (
-            <p className="message-information">
-              La connexion à Google a expiré. Appuyez sur « Reconnecter » pour reprendre.
-            </p>
-          )}
-          {etatProfilActif?.statut === 'erreur' && (
-            <p className="message-erreur">{etatProfilActif.messageErreur}</p>
-          )}
-
           <div className="formulaire-actions">
-            <button
-              type="button"
-              className="bouton-principal"
-              disabled={occupe || etatProfilActif?.statut === 'en_cours'}
-              onClick={() => void executer(synchroniserPartageMaintenant)}
-            >
-              {etatProfilActif?.statut === 'reconnexion_necessaire' ? 'Reconnecter' : 'Synchroniser maintenant'}
-            </button>
             <button
               type="button"
               className="bouton-secondaire"

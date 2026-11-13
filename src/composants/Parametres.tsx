@@ -21,6 +21,7 @@ import {
 } from '../sauvegarde'
 import { telechargerTexte } from '../telechargement'
 import { PartageProfils } from './PartageProfils'
+import { SynchroGlobale } from './SynchroGlobale'
 import { SynchroGoogleDrive } from './SynchroGoogleDrive'
 import { THEMES, appliquerTheme, lireThemeMemorise } from '../themes'
 import type { IdentifiantTheme } from '../themes'
@@ -300,10 +301,9 @@ export function Parametres({
       </section>
 
       <section className="carte-statistique">
-        <SynchroGoogleDrive />
-      </section>
-
-      <section className="carte-statistique">
+        <h3>Synchronisation Google Drive</h3>
+        <SynchroGlobale />
+        <SynchroGoogleDrive integree />
         <PartageProfils profils={profils} profilActifId={profilActifId} />
       </section>
 

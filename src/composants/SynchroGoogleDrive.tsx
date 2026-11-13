@@ -16,7 +16,12 @@ function formaterDateSynchro(dateIso: string | null): string {
   return new Date(dateIso).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })
 }
 
-export function SynchroGoogleDrive() {
+interface ProprietesSynchroGoogleDrive {
+  // Dans Paramètres : le bouton de synchronisation et l'état sont ceux de la section « Synchronisation ».
+  integree?: boolean
+}
+
+export function SynchroGoogleDrive({ integree = false }: ProprietesSynchroGoogleDrive) {
   const etat = useSyncExternalStore(abonnerEtatSynchro, lireEtatSynchro)
   const [motDePasse, setMotDePasse] = useState('')
   const [confirmationMotDePasse, setConfirmationMotDePasse] = useState('')
@@ -61,7 +66,7 @@ export function SynchroGoogleDrive() {
     const connexionEnCours = etat.statut === 'en_cours'
     return (
       <div>
-        <h3>Synchronisation Google Drive</h3>
+        {integree ? <h4>Mes données (tous mes profils)</h4> : <h3>Synchronisation Google Drive</h3>}
         <p className="texte-aide">
           Vos données sont chiffrées sur cet appareil avant d'être envoyées dans un dossier caché de
           votre Google Drive, visible uniquement par cette application. Saisissez le même mot de
@@ -105,6 +110,36 @@ export function SynchroGoogleDrive() {
   }
 
   const enCours = etat.statut === 'en_cours'
+
+  if (integree) {
+    return (
+      <div>
+        <h4>Mes données (tous mes profils)</h4>
+        <p className="texte-aide">
+          Synchronisation personnelle activée : vos profils non partagés sont chiffrés dans un dossier
+          caché de votre Google Drive.
+        </p>
+        <div className="formulaire-actions">
+          <button
+            type="button"
+            className="bouton-secondaire"
+            disabled={enCours}
+            onClick={() => {
+              const confirme = window.confirm(
+                'Se déconnecter de Google Drive ? Les données restent sur cet appareil.',
+              )
+              if (confirme) {
+                void deconnecterGoogleDrive()
+              }
+            }}
+          >
+            Désactiver la synchronisation personnelle
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div>
       <h3>Synchronisation Google Drive</h3>

@@ -852,6 +852,7 @@ button:disabled {
 
 .choix-case {
   display: flex;
+  flex-direction: row;
   align-items: center;
   gap: 0.5rem;
   margin: 0.5rem 0;
@@ -860,4 +861,8 @@ button:disabled {
 
 .choix-case input {
   width: auto;
+}
+
+.lien-invitation input[type='text'] {
+  width: 100%;
 }
