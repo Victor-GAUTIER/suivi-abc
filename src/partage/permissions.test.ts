@@ -63,6 +63,20 @@ describe('permissions Drive', () => {
     })
   })
 
+  it("ajoute le message personnalisé à l'e-mail d'invitation", async () => {
+    const { appels, reseau } = creerReseau(() => new Response('{}', { status: 200 }))
+    await inviterPersonne('f1', 'tante@exemple.fr', 'writer', jeton, reseau, 'Rejoignez le profil : https://site.test/?a=1&b=2')
+    const adresse = new URL(appels[0].url)
+    expect(adresse.searchParams.get('sendNotificationEmail')).toBe('true')
+    expect(adresse.searchParams.get('emailMessage')).toBe('Rejoignez le profil : https://site.test/?a=1&b=2')
+  })
+
+  it("n'ajoute pas de message quand il est vide", async () => {
+    const { appels, reseau } = creerReseau(() => new Response('{}', { status: 200 }))
+    await inviterPersonne('f1', 'tante@exemple.fr', 'writer', jeton, reseau, '')
+    expect(appels[0].url).not.toContain('emailMessage')
+  })
+
   it("retire l'accès avec DELETE sur la permission", async () => {
     const { appels, reseau } = creerReseau(() => new Response(null, { status: 204 }))
     await retirerAcces('f1', 'p2', jeton, reseau)

@@ -849,3 +849,15 @@ button:disabled {
 .choix-theme-nom {
   font-weight: 600;
 }
+
+.choix-case {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.5rem 0;
+  font-weight: 400;
+}
+
+.choix-case input {
+  width: auto;
+}

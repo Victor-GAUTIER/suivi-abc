@@ -51,13 +51,14 @@ export function InvitationProfil({ invitation, onOubliee }: ProprietesInvitation
       return
     }
     setMessageErreur('')
-    if (motDePasse === '') {
+    const motDePasseUtilise = invitation.motDePasse ?? motDePasse
+    if (motDePasseUtilise === '') {
       setMessageErreur('Saisissez le mot de passe du profil.')
       return
     }
     setOccupe(true)
     try {
-      await rejoindrePartage(motDePasse, invitation.identifiantFichier)
+      await rejoindrePartage(motDePasseUtilise, invitation.identifiantFichier)
       setMotDePasse('')
     } catch (erreur) {
       setMessageErreur(lireMessageErreur(erreur))
@@ -72,19 +73,28 @@ export function InvitationProfil({ invitation, onOubliee }: ProprietesInvitation
     <section className="carte-statistique accueil-synchro">
       <h2>Invitation à rejoindre le profil {nomProfil}</h2>
       <form className="formulaire formulaire-sans-cadre" onSubmit={gererRejoindre}>
-        <label>
-          Mot de passe du profil
-          <input
-            type="password"
-            autoComplete="off"
-            value={motDePasse}
-            onChange={(evenement) => setMotDePasse(evenement.target.value)}
-          />
-        </label>
-        <p className="texte-aide">
-          Demandez ce mot de passe à la personne qui vous a envoyé le lien. Vous vous connectez
-          ensuite à Google, puis vous sélectionnez le fichier proposé (un seul clic).
-        </p>
+        {invitation.motDePasse === null ? (
+          <>
+            <label>
+              Mot de passe du profil
+              <input
+                type="password"
+                autoComplete="off"
+                value={motDePasse}
+                onChange={(evenement) => setMotDePasse(evenement.target.value)}
+              />
+            </label>
+            <p className="texte-aide">
+              Demandez ce mot de passe à la personne qui vous a envoyé le lien. Vous vous connectez
+              ensuite à Google, puis vous sélectionnez le fichier proposé (un seul clic).
+            </p>
+          </>
+        ) : (
+          <p className="texte-aide">
+            Vous allez vous connecter à Google, puis sélectionner le fichier proposé (un seul clic).
+            Le mot de passe du profil est déjà dans le lien.
+          </p>
+        )}
         {messageErreur !== '' && <p className="message-erreur">{messageErreur}</p>}
         {messageErreur === '' && etat.erreurReprise !== '' && (
           <p className="message-erreur">{etat.erreurReprise}</p>

@@ -46,14 +46,20 @@ export async function listerPersonnesAvecAcces(
 }
 
 // Google envoie un e-mail d'invitation à la personne.
+// messagePersonnalise : texte ajouté à cet e-mail (par exemple le lien d'invitation de l'application).
 export async function inviterPersonne(
   identifiantFichier: string,
   adresseEmail: string,
   role: RolePartage,
   obtenirJeton: () => Promise<string>,
   appelerReseau: FonctionFetch = (...parametres) => fetch(...parametres),
+  messagePersonnalise: string | null = null,
 ): Promise<void> {
-  const url = `${URL_API_DRIVE}/${identifiantFichier}/permissions?sendNotificationEmail=true`
+  const message =
+    messagePersonnalise !== null && messagePersonnalise !== ''
+      ? `&emailMessage=${encodeURIComponent(messagePersonnalise)}`
+      : ''
+  const url = `${URL_API_DRIVE}/${identifiantFichier}/permissions?sendNotificationEmail=true${message}`
   await appelerDrive(obtenirJeton, appelerReseau, url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

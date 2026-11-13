@@ -29,6 +29,7 @@ describe('analyserInvitation', () => {
     expect(analyserInvitation(`?rejoindre=${IDENTIFIANT}&profil=AB`)).toEqual({
       identifiantFichier: IDENTIFIANT,
       codeProfil: 'AB',
+      motDePasse: null,
     })
   })
 
@@ -47,12 +48,40 @@ describe('analyserInvitation', () => {
 describe('analyserInvitationMemorisee', () => {
   it('relit une invitation valide', () => {
     const brut = JSON.stringify({ identifiantFichier: IDENTIFIANT, codeProfil: 'AB' })
-    expect(analyserInvitationMemorisee(brut)).toEqual({ identifiantFichier: IDENTIFIANT, codeProfil: 'AB' })
+    expect(analyserInvitationMemorisee(brut)).toEqual({
+      identifiantFichier: IDENTIFIANT,
+      codeProfil: 'AB',
+      motDePasse: null,
+    })
   })
 
   it('ignore une valeur absente, illisible ou invalide', () => {
     expect(analyserInvitationMemorisee(null)).toBeNull()
     expect(analyserInvitationMemorisee('pas du json')).toBeNull()
     expect(analyserInvitationMemorisee(JSON.stringify({ identifiantFichier: 'x' }))).toBeNull()
+  })
+})
+
+describe('mot de passe dans le lien', () => {
+  it('le place dans le fragment, jamais dans la requête', () => {
+    const lien = construireLienInvitation('https://site.test/app/', IDENTIFIANT, 'AB', 'mot de passe & co/é')
+    const adresse = new URL(lien)
+    expect(adresse.search).not.toContain('mot')
+    expect(adresse.hash.startsWith('#mdp=')).toBe(true)
+    expect(analyserInvitation(adresse.search, adresse.hash)?.motDePasse).toBe('mot de passe & co/é')
+  })
+
+  it("n'ajoute aucun fragment sans mot de passe", () => {
+    expect(new URL(construireLienInvitation('https://site.test/', IDENTIFIANT, 'AB')).hash).toBe('')
+    expect(new URL(construireLienInvitation('https://site.test/', IDENTIFIANT, 'AB', '')).hash).toBe('')
+  })
+
+  it('ignore un mot de passe démesuré', () => {
+    expect(analyserInvitation(`?rejoindre=${IDENTIFIANT}`, `#mdp=${'x'.repeat(500)}`)?.motDePasse).toBeNull()
+  })
+
+  it('relit un mot de passe mémorisé', () => {
+    const brut = JSON.stringify({ identifiantFichier: IDENTIFIANT, codeProfil: 'AB', motDePasse: 'secret' })
+    expect(analyserInvitationMemorisee(brut)?.motDePasse).toBe('secret')
   })
 })

@@ -49,6 +49,7 @@ export function PartageProfils({ profils, profilActifId }: ProprietesPartageProf
   const [confirmationMotDePasse, setConfirmationMotDePasse] = useState('')
   const [adresseInvitee, setAdresseInvitee] = useState('')
   const [roleInvite, setRoleInvite] = useState<RolePartage>('writer')
+  const [motDePasseDansLien, setMotDePasseDansLien] = useState(true)
   const [droits, setDroits] = useState<DroitsSurFichier | null>(null)
   const [personnes, setPersonnes] = useState<PersonneAvecAcces[]>([])
   const [occupe, setOccupe] = useState(false)
@@ -133,12 +134,27 @@ export function PartageProfils({ profils, profilActifId }: ProprietesPartageProf
           adresseDeRetour(location.origin, location.pathname),
           configurationActive.identifiantFichier,
           profilActif.code,
+          motDePasseDansLien ? configurationActive.motDePasse : null,
         )
+
+  // Texte ajouté par Google à l'e-mail d'invitation.
+  const messageInvitation =
+    profilActif === undefined || lienInvitation === ''
+      ? null
+      : `Vous êtes invité(e) à rejoindre le profil « ${profilActif.code} » dans Suivi ABC.\n\n` +
+        `Ouvrez ce lien pour le rejoindre :\n${lienInvitation}\n\n` +
+        (motDePasseDansLien
+          ? 'Le mot de passe du profil est inclus dans ce lien.'
+          : 'Le mot de passe du profil vous sera communiqué séparément.')
 
   async function copierLienInvitation() {
     try {
       await navigator.clipboard.writeText(lienInvitation)
-      setMessage("Lien copié. N'oubliez pas de transmettre aussi le mot de passe du profil.")
+      setMessage(
+        motDePasseDansLien
+          ? 'Lien copié (il contient le mot de passe : transmettez-le seulement à la personne invitée).'
+          : "Lien copié. N'oubliez pas de transmettre aussi le mot de passe du profil.",
+      )
     } catch {
       setMessageErreur('Copie impossible : sélectionnez le lien et copiez-le à la main.')
     }
@@ -167,10 +183,12 @@ export function PartageProfils({ profils, profilActifId }: ProprietesPartageProf
       return
     }
     await executer(async () => {
-      await inviterAccesPartage(profilActifId, adresseInvitee, roleInvite)
+      await inviterAccesPartage(profilActifId, adresseInvitee, roleInvite, messageInvitation)
       setAdresseInvitee('')
       setMessage(
-        "Invitation envoyée par Google. Communiquez aussi le mot de passe du profil à cette personne (par un autre moyen que l'e-mail).",
+        motDePasseDansLien
+          ? "Invitation envoyée par Google, avec le lien qui ouvre directement le profil (mot de passe inclus)."
+          : "Invitation envoyée par Google, avec le lien. Communiquez aussi le mot de passe du profil à cette personne (par un autre moyen que l'e-mail).",
       )
       await chargerAcces()
     })
@@ -275,10 +293,29 @@ export function PartageProfils({ profils, profilActifId }: ProprietesPartageProf
           <div className="lien-invitation">
             <h4>Lien d'invitation</h4>
             <p className="texte-aide">
-              Envoyez ce lien à la personne invitée : il ouvre l'application sur ce profil. Elle
-              doit aussi connaître le mot de passe du profil, à lui donner séparément (le lien ne le
-              contient pas). Pensez à l'inviter plus bas avec son adresse Google.
+              Ce lien ouvre l'application sur ce profil. Il est ajouté automatiquement à l'e-mail
+              d'invitation envoyé par Google quand vous invitez quelqu'un plus bas. Vous pouvez aussi
+              le copier pour l'envoyer vous-même (la personne doit alors être invitée avec son
+              adresse Google).
             </p>
+            <label className="choix-case">
+              <input
+                type="checkbox"
+                checked={motDePasseDansLien}
+                onChange={(evenement) => setMotDePasseDansLien(evenement.target.checked)}
+              />
+              Inclure le mot de passe dans le lien (plus simple, moins sûr)
+            </label>
+            {motDePasseDansLien ? (
+              <p className="texte-aide">
+                Toute personne qui reçoit ce lien ET a accès au fichier dans Google Drive peut
+                ouvrir le profil. Le mot de passe apparaît dans l'e-mail.
+              </p>
+            ) : (
+              <p className="texte-aide">
+                Donnez le mot de passe séparément (message, de vive voix), jamais dans le même e-mail.
+              </p>
+            )}
             <input
               type="text"
               readOnly

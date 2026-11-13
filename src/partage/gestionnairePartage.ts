@@ -401,9 +401,17 @@ export async function inviterAccesPartage(
   profilId: string,
   adresseEmail: string,
   role: RolePartage,
+  messageInvitation: string | null = null,
 ): Promise<void> {
   const { identifiantFichier } = configurationObligatoire(profilId)
-  await inviterPersonne(identifiantFichier, adresseEmail, role, () => obtenirJetonGoogle(true))
+  await inviterPersonne(
+    identifiantFichier,
+    adresseEmail,
+    role,
+    () => obtenirJetonGoogle(true),
+    undefined,
+    messageInvitation,
+  )
 }
 
 export async function retirerAccesPartage(profilId: string, identifiantPermission: string): Promise<void> {
