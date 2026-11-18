@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 
-export type NomIcone = 'saisie' | 'journal' | 'calendrier' | 'statistiques' | 'parametres'
+export type NomIcone = 'saisie' | 'journal' | 'calendrier' | 'statistiques' | 'parametres' | 'synchro'
 
 // Icônes en traits simples (24 × 24), colorées par la couleur du texte du bouton.
 const TRACES: Record<NomIcone, ReactNode> = {
@@ -32,6 +32,12 @@ const TRACES: Record<NomIcone, ReactNode> = {
       <path d="M4 7h10M18 7h2M4 17h2M10 17h10" />
       <circle cx="16" cy="7" r="2" />
       <circle cx="8" cy="17" r="2" />
+    </>
+  ),
+  synchro: (
+    <>
+      <path d="M20 11a8 8 0 0 0-14.5-4M4 13a8 8 0 0 0 14.5 4" />
+      <path d="M20 4v5h-5M4 20v-5h5" />
     </>
   ),
 }

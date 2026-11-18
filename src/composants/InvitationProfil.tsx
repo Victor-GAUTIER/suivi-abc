@@ -1,6 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
-import type { FormEvent } from 'react'
-import { abonnerEtatPartage, lireEtatPartage, rejoindrePartage } from '../partage/gestionnairePartage'
+import { abonnerEtatSynchro, lireEtatSynchro, rejoindreProfil } from '../synchro/gestionnaire'
 import { oublierInvitation } from '../partage/invitation'
 import type { Invitation } from '../partage/invitation'
 import { prechargerBibliothequeGoogle, synchroGoogleEstConfiguree } from '../synchro/googleAuth'
@@ -17,8 +16,7 @@ interface ProprietesInvitationProfil {
 
 // Carte affichée quand l'application a été ouverte depuis un lien d'invitation.
 export function InvitationProfil({ invitation, onOubliee }: ProprietesInvitationProfil) {
-  const etat = useSyncExternalStore(abonnerEtatPartage, lireEtatPartage)
-  const [motDePasse, setMotDePasse] = useState('')
+  const etat = useSyncExternalStore(abonnerEtatSynchro, lireEtatSynchro)
   const [occupe, setOccupe] = useState(false)
   const [messageErreur, setMessageErreur] = useState('')
 
@@ -45,21 +43,14 @@ export function InvitationProfil({ invitation, onOubliee }: ProprietesInvitation
     return null
   }
 
-  async function gererRejoindre(evenement: FormEvent<HTMLFormElement>) {
-    evenement.preventDefault()
+  async function gererRejoindre() {
     if (invitation === null) {
       return
     }
     setMessageErreur('')
-    const motDePasseUtilise = invitation.motDePasse ?? motDePasse
-    if (motDePasseUtilise === '') {
-      setMessageErreur('Saisissez le mot de passe du profil.')
-      return
-    }
     setOccupe(true)
     try {
-      await rejoindrePartage(motDePasseUtilise, invitation.identifiantFichier)
-      setMotDePasse('')
+      await rejoindreProfil(invitation.identifiantFichier)
     } catch (erreur) {
       setMessageErreur(lireMessageErreur(erreur))
     } finally {
@@ -72,50 +63,30 @@ export function InvitationProfil({ invitation, onOubliee }: ProprietesInvitation
   return (
     <section className="carte-statistique accueil-synchro">
       <h2>Invitation à rejoindre le profil {nomProfil}</h2>
-      <form className="formulaire formulaire-sans-cadre" onSubmit={gererRejoindre}>
-        {invitation.motDePasse === null ? (
-          <>
-            <label>
-              Mot de passe du profil
-              <input
-                type="password"
-                autoComplete="off"
-                value={motDePasse}
-                onChange={(evenement) => setMotDePasse(evenement.target.value)}
-              />
-            </label>
-            <p className="texte-aide">
-              Demandez ce mot de passe à la personne qui vous a envoyé le lien. Vous vous connectez
-              ensuite à Google, puis vous sélectionnez le fichier proposé (un seul clic).
-            </p>
-          </>
-        ) : (
-          <p className="texte-aide">
-            Vous allez vous connecter à Google, puis sélectionner le fichier proposé (un seul clic).
-            Le mot de passe du profil est déjà dans le lien.
-          </p>
-        )}
-        {messageErreur !== '' && <p className="message-erreur">{messageErreur}</p>}
-        {messageErreur === '' && etat.erreurReprise !== '' && (
-          <p className="message-erreur">{etat.erreurReprise}</p>
-        )}
-        <div className="formulaire-actions">
-          <button type="submit" className="bouton-principal" disabled={occupe}>
-            {occupe ? 'Ouverture de Google…' : 'Rejoindre ce profil'}
-          </button>
-          <button
-            type="button"
-            className="bouton-secondaire"
-            disabled={occupe}
-            onClick={() => {
-              oublierInvitation()
-              onOubliee()
-            }}
-          >
-            Ignorer
-          </button>
-        </div>
-      </form>
+      <p className="texte-aide">
+        Appuyez sur le bouton, connectez-vous à Google, puis cliquez sur le fichier proposé : le
+        profil s'ouvre.
+      </p>
+      {messageErreur !== '' && <p className="message-erreur">{messageErreur}</p>}
+      {messageErreur === '' && etat.statut === 'erreur' && etat.messageErreur !== '' && (
+        <p className="message-erreur">{etat.messageErreur}</p>
+      )}
+      <div className="formulaire-actions">
+        <button type="button" className="bouton-principal" disabled={occupe} onClick={() => void gererRejoindre()}>
+          {occupe ? 'Ouverture de Google…' : 'Rejoindre ce profil'}
+        </button>
+        <button
+          type="button"
+          className="bouton-secondaire"
+          disabled={occupe}
+          onClick={() => {
+            oublierInvitation()
+            onOubliee()
+          }}
+        >
+          Ignorer
+        </button>
+      </div>
     </section>
   )
 }

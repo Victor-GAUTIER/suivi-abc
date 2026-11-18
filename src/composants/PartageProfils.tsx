@@ -1,55 +1,44 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 import type { FormEvent } from 'react'
 import {
-  abonnerEtatPartage,
-  activerPartage,
-  arreterPartage,
   inviterAccesPartage,
   lireDroitsPartage,
-  lireEtatPartage,
   listerAccesPartage,
   retirerAccesPartage,
 } from '../partage/gestionnairePartage'
 import { construireLienInvitation } from '../partage/invitation'
 import { LIBELLES_ROLES } from '../partage/permissions'
 import type { DroitsSurFichier, PersonneAvecAcces, RolePartage } from '../partage/permissions'
-import { prechargerBibliothequeGoogle, synchroGoogleEstConfiguree } from '../synchro/googleAuth'
-import type { Profil } from '../types'
+import { abonnerEtatSynchro, lireEtatSynchro } from '../synchro/gestionnaire'
+import { synchroGoogleEstConfiguree } from '../synchro/googleAuth'
 import { adresseDeRetour } from '../synchro/redirectionGoogle'
-import { RejoindreProfilPartage } from './RejoindreProfilPartage'
+import type { Profil } from '../types'
 
 interface ProprietesPartageProfils {
   profils: Profil[]
   profilActifId: string
 }
 
-const LONGUEUR_MINIMALE_MOT_DE_PASSE = 8
-
 function lireMessageErreur(erreur: unknown): string {
   return erreur instanceof Error ? erreur.message : "L'opération a échoué."
 }
 
+// Partager le profil actif : on saisit une adresse Google, Google envoie un e-mail contenant
+// le lien. La personne clique sur le lien et arrive sur le profil.
 export function PartageProfils({ profils, profilActifId }: ProprietesPartageProfils) {
-  const etat = useSyncExternalStore(abonnerEtatPartage, lireEtatPartage)
+  const etat = useSyncExternalStore(abonnerEtatSynchro, lireEtatSynchro)
   const profilActif = profils.find((profil) => profil.id === profilActifId)
   const configurationActive = etat.configurations.find(
     (configuration) => configuration.profilId === profilActifId,
   )
 
-  const [motDePasse, setMotDePasse] = useState('')
-  const [confirmationMotDePasse, setConfirmationMotDePasse] = useState('')
   const [adresseInvitee, setAdresseInvitee] = useState('')
   const [roleInvite, setRoleInvite] = useState<RolePartage>('writer')
-  const [motDePasseDansLien, setMotDePasseDansLien] = useState(true)
   const [droits, setDroits] = useState<DroitsSurFichier | null>(null)
   const [personnes, setPersonnes] = useState<PersonneAvecAcces[]>([])
   const [occupe, setOccupe] = useState(false)
   const [message, setMessage] = useState('')
   const [messageErreur, setMessageErreur] = useState('')
-
-  useEffect(() => {
-    prechargerBibliothequeGoogle()
-  }, [])
 
   const chargerAcces = useCallback(async () => {
     if (configurationActive === undefined) {
@@ -57,40 +46,24 @@ export function PartageProfils({ profils, profilActifId }: ProprietesPartageProf
       setPersonnes([])
       return
     }
-    try {
-      const droitsLus = await lireDroitsPartage(profilActifId)
-      setDroits(droitsLus)
-      setPersonnes(droitsLus.peutPartager ? await listerAccesPartage(profilActifId) : [])
-    } catch (erreur) {
-      setDroits(null)
-      setPersonnes([])
-      setMessageErreur(lireMessageErreur(erreur))
-    }
+    const droitsLus = await lireDroitsPartage(profilActifId)
+    setDroits(droitsLus)
+    setPersonnes(droitsLus.peutPartager ? await listerAccesPartage(profilActifId) : [])
     // Seul l'identifiant du fichier compte ici, pas l'état de synchro qui change souvent.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profilActifId, configurationActive?.identifiantFichier])
-
-  useEffect(() => {
-    setMessage('')
-    setMessageErreur('')
-  }, [profilActifId])
 
   useEffect(() => {
     // Le chargement n'est tenté qu'au clic sur « Afficher les accès » pour ne pas
     // ouvrir de fenêtre Google sans action de l'utilisateur.
+    setMessage('')
+    setMessageErreur('')
     setDroits(null)
     setPersonnes([])
   }, [profilActifId, configurationActive?.identifiantFichier])
 
   if (!synchroGoogleEstConfiguree()) {
-    return (
-      <div>
-        <h3>Partage de profils</h3>
-        <p className="texte-aide">
-          Le partage n'est pas activé dans cette version de l'application (connexion Google non
-          configurée).
-        </p>
-      </div>
-    )
+    return null
   }
 
   async function executer(operation: () => Promise<void>) {
@@ -106,18 +79,6 @@ export function PartageProfils({ profils, profilActifId }: ProprietesPartageProf
     }
   }
 
-  function verifierMotDePasseChoisi(): boolean {
-    if (motDePasse.length < LONGUEUR_MINIMALE_MOT_DE_PASSE) {
-      setMessageErreur(`Le mot de passe doit contenir au moins ${LONGUEUR_MINIMALE_MOT_DE_PASSE} caractères.`)
-      return false
-    }
-    if (motDePasse !== confirmationMotDePasse) {
-      setMessageErreur('Les deux mots de passe ne sont pas identiques.')
-      return false
-    }
-    return true
-  }
-
   const lienInvitation =
     configurationActive === undefined || profilActif === undefined
       ? ''
@@ -125,7 +86,6 @@ export function PartageProfils({ profils, profilActifId }: ProprietesPartageProf
           adresseDeRetour(location.origin, location.pathname),
           configurationActive.identifiantFichier,
           profilActif.code,
-          motDePasseDansLien ? configurationActive.motDePasse : null,
         )
 
   // Texte ajouté par Google à l'e-mail d'invitation.
@@ -133,40 +93,7 @@ export function PartageProfils({ profils, profilActifId }: ProprietesPartageProf
     profilActif === undefined || lienInvitation === ''
       ? null
       : `Vous êtes invité(e) à rejoindre le profil « ${profilActif.code} » dans Suivi ABC.\n\n` +
-        `Ouvrez ce lien pour le rejoindre :\n${lienInvitation}\n\n` +
-        (motDePasseDansLien
-          ? 'Le mot de passe du profil est inclus dans ce lien.'
-          : 'Le mot de passe du profil vous sera communiqué séparément.')
-
-  async function copierLienInvitation() {
-    try {
-      await navigator.clipboard.writeText(lienInvitation)
-      setMessage(
-        motDePasseDansLien
-          ? 'Lien copié (il contient le mot de passe : transmettez-le seulement à la personne invitée).'
-          : "Lien copié. N'oubliez pas de transmettre aussi le mot de passe du profil.",
-      )
-    } catch {
-      setMessageErreur('Copie impossible : sélectionnez le lien et copiez-le à la main.')
-    }
-  }
-
-  async function gererActivation(evenement: FormEvent<HTMLFormElement>) {
-    evenement.preventDefault()
-    if (profilActif === undefined) {
-      return
-    }
-    setMessageErreur('')
-    if (!verifierMotDePasseChoisi()) {
-      return
-    }
-    await executer(async () => {
-      await activerPartage(profilActif.id, profilActif.code, motDePasse)
-      setMotDePasse('')
-      setConfirmationMotDePasse('')
-      setMessage('Partage activé. Vous pouvez maintenant inviter des personnes.')
-    })
-  }
+        `Ouvrez ce lien pour le rejoindre :\n${lienInvitation}`
 
   async function gererInvitation(evenement: FormEvent<HTMLFormElement>) {
     evenement.preventDefault()
@@ -176,64 +103,36 @@ export function PartageProfils({ profils, profilActifId }: ProprietesPartageProf
     await executer(async () => {
       await inviterAccesPartage(profilActifId, adresseInvitee, roleInvite, messageInvitation)
       setAdresseInvitee('')
-      setMessage(
-        motDePasseDansLien
-          ? "Invitation envoyée par Google, avec le lien qui ouvre directement le profil (mot de passe inclus)."
-          : "Invitation envoyée par Google, avec le lien. Communiquez aussi le mot de passe du profil à cette personne (par un autre moyen que l'e-mail).",
-      )
+      setMessage('Invitation envoyée par Google. La personne n’a qu’à cliquer sur le lien reçu.')
       await chargerAcces()
     })
   }
 
+  async function copierLienInvitation() {
+    try {
+      await navigator.clipboard.writeText(lienInvitation)
+      setMessage('Lien copié. Il ne fonctionne que pour les comptes Google déjà invités.')
+    } catch {
+      setMessageErreur('Copie impossible : sélectionnez le lien et copiez-le à la main.')
+    }
+  }
+
   return (
     <div>
-      <h4>Profils partagés</h4>
+      <h4>Partager le profil{profilActif !== undefined ? ` « ${profilActif.code} »` : ''}</h4>
       <p className="texte-aide">
-        Un profil partagé est un fichier chiffré dans votre Google Drive, que vous partagez avec
-        d'autres comptes Google. Les personnes invitées peuvent ajouter ou modifier des saisies,
-        qui se synchronisent entre tous les appareils.
+        Saisissez l'adresse Google de la personne : elle reçoit un e-mail avec un lien. Un clic sur
+        le lien, une connexion à Google, et le profil s'ouvre chez elle. Les saisies se
+        synchronisent ensuite entre tous vos appareils.
       </p>
 
-      {profilActif !== undefined && configurationActive === undefined && (
-        <form className="formulaire formulaire-sans-cadre" onSubmit={gererActivation}>
-          <h4>Partager le profil « {profilActif.code} »</h4>
-          <label>
-            Mot de passe de ce profil
-            <input
-              type="password"
-              autoComplete="new-password"
-              value={motDePasse}
-              onChange={(evenement) => setMotDePasse(evenement.target.value)}
-              required
-            />
-          </label>
-          <label>
-            Confirmer le mot de passe
-            <input
-              type="password"
-              autoComplete="new-password"
-              value={confirmationMotDePasse}
-              onChange={(evenement) => setConfirmationMotDePasse(evenement.target.value)}
-              required
-            />
-          </label>
-          <p className="texte-aide">
-            Toutes les personnes qui partagent ce profil utilisent ce même mot de passe. Il est
-            impossible de le récupérer s'il est perdu. Le code du profil apparaît dans le nom du
-            fichier Drive et dans l'e-mail d'invitation : choisissez un code qui ne permet pas
-            d'identifier la personne.
-          </p>
-          <div className="formulaire-actions">
-            <button type="submit" className="bouton-principal" disabled={occupe}>
-              {occupe ? 'Activation…' : 'Activer le partage de ce profil'}
-            </button>
-          </div>
-        </form>
-      )}
-
-      {profilActif !== undefined && configurationActive !== undefined && (
-        <div>
-          <h4>Profil « {profilActif.code} » partagé</h4>
+      {configurationActive === undefined ? (
+        <p className="texte-aide">
+          Ce profil n'est pas encore synchronisé : appuyez sur « Synchroniser » pour pouvoir le
+          partager.
+        </p>
+      ) : (
+        <>
           <div className="formulaire-actions">
             <button
               type="button"
@@ -241,146 +140,92 @@ export function PartageProfils({ profils, profilActifId }: ProprietesPartageProf
               disabled={occupe}
               onClick={() => void executer(chargerAcces)}
             >
-              Afficher les accès
-            </button>
-            <button
-              type="button"
-              className="bouton-secondaire"
-              disabled={occupe}
-              onClick={() => {
-                const confirme = window.confirm(
-                  'Arrêter la synchronisation de ce profil sur cet appareil ? Les données restent sur cet appareil et le fichier reste dans Drive.',
-                )
-                if (confirme) {
-                  void executer(() => arreterPartage(profilActifId))
-                }
-              }}
-            >
-              Arrêter sur cet appareil
+              Afficher les personnes ayant accès
             </button>
           </div>
 
-          <div className="lien-invitation">
-            <h4>Lien d'invitation</h4>
+          {droits !== null && !droits.peutPartager && (
             <p className="texte-aide">
-              Ce lien ouvre l'application sur ce profil. Il est ajouté automatiquement à l'e-mail
-              d'invitation envoyé par Google quand vous invitez quelqu'un plus bas. Vous pouvez aussi
-              le copier pour l'envoyer vous-même (la personne doit alors être invitée avec son
-              adresse Google).
+              Vous avez accès à ce profil en {droits.peutModifier ? 'modification' : 'lecture seule'}.
+              Seul le propriétaire peut gérer les accès.
             </p>
-            <label className="choix-case">
-              <input
-                type="checkbox"
-                checked={motDePasseDansLien}
-                onChange={(evenement) => setMotDePasseDansLien(evenement.target.checked)}
-              />
-              Inclure le mot de passe dans le lien (plus simple, moins sûr)
-            </label>
-            {motDePasseDansLien ? (
-              <p className="texte-aide">
-                Toute personne qui reçoit ce lien ET a accès au fichier dans Google Drive peut
-                ouvrir le profil. Le mot de passe apparaît dans l'e-mail.
-              </p>
-            ) : (
-              <p className="texte-aide">
-                Donnez le mot de passe séparément (message, de vive voix), jamais dans le même e-mail.
-              </p>
-            )}
-            <input
-              type="text"
-              readOnly
-              value={lienInvitation}
-              aria-label="Lien d'invitation"
-              onFocus={(evenement) => evenement.target.select()}
-            />
-            <div className="formulaire-actions">
-              <button
-                type="button"
-                className="bouton-secondaire"
-                onClick={() => void copierLienInvitation()}
-              >
-                Copier le lien
-              </button>
-            </div>
-          </div>
-
-          {droits !== null && (
-            <div>
-              {droits.peutPartager ? (
-                <>
-                  <h4>Personnes ayant accès</h4>
-                  <ul className="liste-acces">
-                    {personnes.map((personne) => (
-                      <li key={personne.identifiantPermission}>
-                        <span>
-                          {personne.adresseEmail}
-                          {personne.nomAffiche !== '' ? ` (${personne.nomAffiche})` : ''} —{' '}
-                          {LIBELLES_ROLES[personne.role] ?? personne.role}
-                        </span>
-                        {personne.role !== 'owner' && (
-                          <button
-                            type="button"
-                            className="bouton-secondaire"
-                            disabled={occupe}
-                            onClick={() =>
-                              void executer(async () => {
-                                await retirerAccesPartage(profilActifId, personne.identifiantPermission)
-                                await chargerAcces()
-                              })
-                            }
-                          >
-                            Retirer
-                          </button>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                  <form className="formulaire formulaire-sans-cadre" onSubmit={gererInvitation}>
-                    <div className="ligne-champs">
-                      <label>
-                        Adresse du compte Google à inviter
-                        <input
-                          type="email"
-                          value={adresseInvitee}
-                          onChange={(evenement) => setAdresseInvitee(evenement.target.value)}
-                          required
-                        />
-                      </label>
-                      <label>
-                        Droits
-                        <select
-                          value={roleInvite}
-                          onChange={(evenement) => setRoleInvite(evenement.target.value as RolePartage)}
-                        >
-                          <option value="writer">Peut modifier</option>
-                          <option value="reader">Lecture seule</option>
-                        </select>
-                      </label>
-                    </div>
-                    <div className="formulaire-actions">
-                      <button type="submit" className="bouton-principal" disabled={occupe}>
-                        Inviter
-                      </button>
-                    </div>
-                  </form>
-                  <p className="texte-aide">
-                    Retirer une personne coupe son accès au fichier, mais elle garde ce qu'elle a déjà
-                    synchronisé et connaît le mot de passe : pour une révocation complète, créez un
-                    nouveau partage avec un nouveau mot de passe.
-                  </p>
-                </>
-              ) : (
-                <p className="texte-aide">
-                  Vous avez accès à ce profil en {droits.peutModifier ? 'modification' : 'lecture seule'}.
-                  Seul le propriétaire peut gérer les accès.
-                </p>
-              )}
-            </div>
           )}
-        </div>
-      )}
 
-      <RejoindreProfilPartage />
+          {(droits === null || droits.peutPartager) && (
+            <form className="formulaire formulaire-sans-cadre" onSubmit={gererInvitation}>
+              <div className="ligne-champs">
+                <label>
+                  Adresse Google à inviter
+                  <input
+                    type="email"
+                    value={adresseInvitee}
+                    onChange={(evenement) => setAdresseInvitee(evenement.target.value)}
+                    required
+                  />
+                </label>
+                <label>
+                  Droits
+                  <select
+                    value={roleInvite}
+                    onChange={(evenement) => setRoleInvite(evenement.target.value as RolePartage)}
+                  >
+                    <option value="writer">Peut modifier</option>
+                    <option value="reader">Lecture seule</option>
+                  </select>
+                </label>
+              </div>
+              <div className="formulaire-actions">
+                <button type="submit" className="bouton-principal" disabled={occupe}>
+                  Inviter
+                </button>
+                <button
+                  type="button"
+                  className="bouton-secondaire"
+                  onClick={() => void copierLienInvitation()}
+                >
+                  Copier le lien
+                </button>
+              </div>
+            </form>
+          )}
+
+          {droits?.peutPartager === true && (
+            <>
+              <h4>Personnes ayant accès</h4>
+              <ul className="liste-acces">
+                {personnes.map((personne) => (
+                  <li key={personne.identifiantPermission}>
+                    <span>
+                      {personne.adresseEmail}
+                      {personne.nomAffiche !== '' ? ` (${personne.nomAffiche})` : ''} —{' '}
+                      {LIBELLES_ROLES[personne.role] ?? personne.role}
+                    </span>
+                    {personne.role !== 'owner' && (
+                      <button
+                        type="button"
+                        className="bouton-secondaire"
+                        disabled={occupe}
+                        onClick={() =>
+                          void executer(async () => {
+                            await retirerAccesPartage(profilActifId, personne.identifiantPermission)
+                            await chargerAcces()
+                          })
+                        }
+                      >
+                        Retirer
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              <p className="texte-aide">
+                Retirer une personne coupe son accès au fichier, mais elle garde ce qu'elle a déjà
+                synchronisé sur ses appareils.
+              </p>
+            </>
+          )}
+        </>
+      )}
 
       {message !== '' && <p className="message-information">{message}</p>}
       {messageErreur !== '' && <p className="message-erreur">{messageErreur}</p>}

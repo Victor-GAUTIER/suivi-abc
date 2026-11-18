@@ -135,22 +135,17 @@ export function lireRetourRedirectionDansLaPage(): RetourRedirection {
   return retour
 }
 
-// Le mot de passe saisi avant la redirection (et, pour une invitation, le fichier visé) est gardé
-// le temps de l'aller-retour (onglet courant uniquement), puis supprimé dès la lecture.
+// L'action commencée avant la redirection (et, pour une invitation, le fichier visé) est gardée
+// le temps de l'aller-retour (onglet courant uniquement), puis supprimée dès la lecture.
 export interface ActionReprise {
-  motDePasse: string
   identifiantFichier: string | null
 }
 
 export function memoriserActionEnAttente(
   action: ActionEnAttente,
-  motDePasse: string,
   identifiantFichier: string | null = null,
 ): void {
-  ecrireSession(
-    PREFIXE_ACTION_EN_ATTENTE + action,
-    JSON.stringify({ motDePasse, identifiantFichier }),
-  )
+  ecrireSession(PREFIXE_ACTION_EN_ATTENTE + action, JSON.stringify({ identifiantFichier }))
 }
 
 // Lit et supprime l'action en attente. Renvoie null s'il n'y en a pas.
@@ -162,12 +157,8 @@ export function recupererActionEnAttente(action: ActionEnAttente): ActionReprise
     return null
   }
   try {
-    const contenu = JSON.parse(brut) as { motDePasse?: unknown; identifiantFichier?: unknown }
-    if (typeof contenu.motDePasse !== 'string' || contenu.motDePasse === '') {
-      return null
-    }
+    const contenu = JSON.parse(brut) as { identifiantFichier?: unknown }
     return {
-      motDePasse: contenu.motDePasse,
       identifiantFichier:
         typeof contenu.identifiantFichier === 'string' && contenu.identifiantFichier !== ''
           ? contenu.identifiantFichier

@@ -1,27 +1,5 @@
-import { ecrireParametre, lireParametre } from '../depot'
-import { maintenantHorodatage } from '../dates'
-import { serialiserSauvegarde } from '../sauvegarde'
-import { creerDepotLocalPourProfil, ecouterModificationsLocales } from '../synchro/depotLocal'
-import {
-  lireErreurRetourRedirection,
-  obtenirJetonGoogle,
-  oublierJetonGoogle,
-  synchroGoogleEstConfiguree,
-  unJetonEstMemorise,
-} from '../synchro/googleAuth'
-import {
-  doitUtiliserRedirection,
-  memoriserActionEnAttente,
-  recupererActionEnAttente,
-} from '../synchro/redirectionGoogle'
-import { creerFichierDrive, StockageFichierDrive } from '../synchro/googleDrive'
-import { oublierInvitation } from './invitation'
-import { lireSauvegardeDistante, synchroniser } from '../synchro/moteur'
-import {
-  ErreurAccesFichierDrive,
-  ErreurAuthentificationGoogle,
-  ErreurMotDePasse,
-} from '../synchro/types'
+import { obtenirJetonGoogle } from '../synchro/googleAuth'
+import { trouverConfigurationProfil } from '../synchro/gestionnaire'
 import {
   inviterPersonne,
   listerPersonnesAvecAcces,
@@ -29,383 +7,35 @@ import {
   retirerAcces,
 } from './permissions'
 import type { DroitsSurFichier, PersonneAvecAcces, RolePartage } from './permissions'
-import { choisirFichierDrive } from './selecteurGoogle'
 
-const CLE_CONFIGURATIONS_PARTAGE = 'partageProfils'
+// Actions de partage d'un profil. Le fichier du profil est créé par la synchronisation ;
+// ces actions s'appliquent donc à un profil déjà synchronisé.
 
-const DELAI_APRES_MODIFICATION_MS = 4_000
-const DELAI_ENTRE_SYNCHROS_PERIODIQUES_MS = 5 * 60_000
-const DELAI_MINIMAL_RETOUR_ONGLET_MS = 30_000
-
-// Les réglages du partage restent sur l'appareil (le mot de passe aussi, comme pour la synchro).
-export interface ConfigurationPartage {
-  profilId: string
-  identifiantFichier: string
-  motDePasse: string
-}
-
-export type StatutPartageProfil = 'repos' | 'en_cours' | 'reconnexion_necessaire' | 'erreur'
-
-export interface EtatPartageProfil {
-  statut: StatutPartageProfil
-  messageErreur: string
-  derniereSynchroLe: string | null
-}
-
-export interface EtatPartage {
-  configurations: ConfigurationPartage[]
-  parProfil: Record<string, EtatPartageProfil>
-  // Résultat d'un « rejoindre un profil » repris après le retour de Google (iPhone).
-  messageReprise: string
-  erreurReprise: string
-  // Dernier profil ajouté par « rejoindre » : l'application s'ouvre dessus.
-  profilRejointId: string
-}
-
-let etatCourant: EtatPartage = { configurations: [], parProfil: {}, messageReprise: '', erreurReprise: '', profilRejointId: '' }
-const ecouteursEtat = new Set<() => void>()
-
-function changerEtat(nouvelEtat: EtatPartage): void {
-  etatCourant = nouvelEtat
-  ecouteursEtat.forEach((ecouteur) => ecouteur())
-}
-
-function changerEtatProfil(profilId: string, modifications: Partial<EtatPartageProfil>): void {
-  const etatPrecedent: EtatPartageProfil = etatCourant.parProfil[profilId] ?? {
-    statut: 'repos',
-    messageErreur: '',
-    derniereSynchroLe: null,
-  }
-  changerEtat({
-    ...etatCourant,
-    parProfil: { ...etatCourant.parProfil, [profilId]: { ...etatPrecedent, ...modifications } },
-  })
-}
-
-export function lireEtatPartage(): EtatPartage {
-  return etatCourant
-}
-
-export function abonnerEtatPartage(ecouteur: () => void): () => void {
-  ecouteursEtat.add(ecouteur)
-  return () => {
-    ecouteursEtat.delete(ecouteur)
-  }
-}
-
-export function trouverConfigurationPartage(profilId: string): ConfigurationPartage | undefined {
-  return etatCourant.configurations.find((configuration) => configuration.profilId === profilId)
-}
-
-async function enregistrerConfigurations(configurations: ConfigurationPartage[]): Promise<void> {
-  await ecrireParametre(CLE_CONFIGURATIONS_PARTAGE, JSON.stringify(configurations))
-  changerEtat({ ...etatCourant, configurations })
-}
-
-function lireConfigurationsEnregistrees(texte: string | undefined): ConfigurationPartage[] {
-  if (texte === undefined || texte === '') {
-    return []
-  }
-  try {
-    const valeur = JSON.parse(texte) as unknown
-    return Array.isArray(valeur) ? (valeur as ConfigurationPartage[]) : []
-  } catch {
-    return []
-  }
-}
-
-function messageErreurLisible(erreur: unknown): string {
-  if (!navigator.onLine) {
-    return 'Hors ligne : la synchronisation reprendra au retour du réseau.'
-  }
-  return erreur instanceof Error ? erreur.message : 'La synchronisation a échoué.'
-}
-
-// ---------- Synchronisation des profils partagés ----------
-
-let synchroEnCours: Promise<void> | null = null
-let modificationPendantSynchro = false
-let minuteurApresModification: ReturnType<typeof setTimeout> | null = null
-let derniereTentativeLe = 0
-let declencheursInstalles = false
-let initialisationFaite = false
-
-async function synchroniserUnProfil(
-  configuration: ConfigurationPartage,
-  interactif: boolean,
-): Promise<void> {
-  changerEtatProfil(configuration.profilId, { statut: 'en_cours', messageErreur: '' })
-  try {
-    const stockage = new StockageFichierDrive(configuration.identifiantFichier, () =>
-      obtenirJetonGoogle(interactif),
-    )
-    const resultat = await synchroniser(
-      stockage,
-      creerDepotLocalPourProfil(configuration.profilId),
-      configuration.motDePasse,
-    )
-    changerEtatProfil(configuration.profilId, {
-      statut: 'repos',
-      messageErreur: '',
-      derniereSynchroLe: resultat.termineLe,
-    })
-  } catch (erreur) {
-    if (erreur instanceof ErreurAuthentificationGoogle) {
-      oublierJetonGoogle()
-      changerEtatProfil(configuration.profilId, { statut: 'reconnexion_necessaire', messageErreur: '' })
-      throw erreur
-    }
-    const message =
-      erreur instanceof ErreurMotDePasse || erreur instanceof ErreurAccesFichierDrive
-        ? erreur.message
-        : messageErreurLisible(erreur)
-    changerEtatProfil(configuration.profilId, { statut: 'erreur', messageErreur: message })
-  }
-}
-
-async function executerSynchroPartages(interactif: boolean): Promise<void> {
-  if (synchroEnCours !== null) {
-    return synchroEnCours
-  }
-  synchroEnCours = (async () => {
-    derniereTentativeLe = Date.now()
-    for (const configuration of etatCourant.configurations) {
-      try {
-        await synchroniserUnProfil(configuration, interactif)
-      } catch {
-        // La connexion Google a expiré : inutile d'essayer les autres profils.
-        for (const autre of etatCourant.configurations) {
-          changerEtatProfil(autre.profilId, { statut: 'reconnexion_necessaire', messageErreur: '' })
-        }
-        break
-      }
-    }
-  })()
-  await synchroEnCours
-  synchroEnCours = null
-  if (modificationPendantSynchro) {
-    modificationPendantSynchro = false
-    planifierSynchroApresModification()
-  }
-}
-
-export async function synchroniserProfilsPartages(interactif: boolean): Promise<void> {
-  if (etatCourant.configurations.length === 0) {
-    return
-  }
-  await executerSynchroPartages(interactif)
-}
-
-function toutNecessiteUneReconnexion(): boolean {
-  return (
-    etatCourant.configurations.length > 0 &&
-    etatCourant.configurations.every(
-      (configuration) => etatCourant.parProfil[configuration.profilId]?.statut === 'reconnexion_necessaire',
-    )
-  )
-}
-
-function planifierSynchroApresModification(): void {
-  if (etatCourant.configurations.length === 0) {
-    return
-  }
-  if (minuteurApresModification !== null) {
-    clearTimeout(minuteurApresModification)
-  }
-  minuteurApresModification = setTimeout(() => {
-    minuteurApresModification = null
-    if (!toutNecessiteUneReconnexion()) {
-      void synchroniserProfilsPartages(false)
-    }
-  }, DELAI_APRES_MODIFICATION_MS)
-}
-
-function installerDeclencheurs(): void {
-  if (declencheursInstalles) {
-    return
-  }
-  declencheursInstalles = true
-
-  ecouterModificationsLocales(() => {
-    if (synchroEnCours !== null) {
-      modificationPendantSynchro = true
-      return
-    }
-    planifierSynchroApresModification()
-  })
-
-  document.addEventListener('visibilitychange', () => {
-    const delaiEcoule = Date.now() - derniereTentativeLe > DELAI_MINIMAL_RETOUR_ONGLET_MS
-    if (document.visibilityState === 'visible' && delaiEcoule) {
-      void synchroniserProfilsPartages(false)
-    }
-  })
-
-  window.addEventListener('online', () => {
-    void synchroniserProfilsPartages(false)
-  })
-
-  setInterval(() => {
-    if (!toutNecessiteUneReconnexion()) {
-      void synchroniserProfilsPartages(false)
-    }
-  }, DELAI_ENTRE_SYNCHROS_PERIODIQUES_MS)
-}
-
-// À appeler une fois au démarrage de l'application.
-export async function initialiserPartage(): Promise<void> {
-  if (initialisationFaite || !synchroGoogleEstConfiguree()) {
-    return
-  }
-  initialisationFaite = true
-  const configurations = lireConfigurationsEnregistrees(
-    await lireParametre(CLE_CONFIGURATIONS_PARTAGE),
-  )
-  changerEtat({ ...etatCourant, configurations })
-
-  // Retour de Google après « rejoindre un profil » sur iPhone : on ouvre le sélecteur de fichiers.
-  const reprise = recupererActionEnAttente('rejoindre')
-  if (reprise !== null) {
-    const erreurRedirection = lireErreurRetourRedirection()
-    if (erreurRedirection !== '' || !unJetonEstMemorise()) {
-      changerEtat({
-        ...etatCourant,
-        erreurReprise: erreurRedirection !== '' ? erreurRedirection : 'La connexion à Google a échoué.',
-      })
-    } else {
-      try {
-        const profilId = await rejoindrePartage(reprise.motDePasse, reprise.identifiantFichier)
-        if (profilId !== null) {
-          changerEtat({ ...etatCourant, messageReprise: 'Profil ajouté.' })
-        }
-      } catch (erreur) {
-        changerEtat({ ...etatCourant, erreurReprise: messageErreurLisible(erreur) })
-      }
-    }
-  }
-
-  if (etatCourant.configurations.length > 0) {
-    installerDeclencheurs()
-    void synchroniserProfilsPartages(false)
-  }
-}
-
-// ---------- Actions déclenchées par l'utilisateur (depuis un clic) ----------
-
-// Crée le fichier du profil dans « Mon Drive » (chiffré) et active sa synchro.
-export async function activerPartage(
-  profilId: string,
-  codeProfil: string,
-  motDePasse: string,
-): Promise<void> {
-  if (trouverConfigurationPartage(profilId) !== undefined) {
-    throw new Error('Le partage est déjà activé pour ce profil.')
-  }
-  const jeton = () => obtenirJetonGoogle(true)
-  await jeton()
-  const depot = creerDepotLocalPourProfil(profilId)
-  const contenu = await serialiserSauvegarde(await depot.lireSauvegarde(), motDePasse)
-  const identifiantFichier = await creerFichierDrive(`Suivi ABC - profil ${codeProfil}.json`, contenu, jeton)
-  await enregistrerConfigurations([
-    ...etatCourant.configurations,
-    { profilId, identifiantFichier, motDePasse },
-  ])
-  changerEtatProfil(profilId, {
-    statut: 'repos',
-    messageErreur: '',
-    derniereSynchroLe: maintenantHorodatage(),
-  })
-  installerDeclencheurs()
-}
-
-// Choisit un fichier de profil dans Drive (sélecteur Google), le déchiffre et l'ajoute à l'appareil.
-// Renvoie l'identifiant du profil ajouté, ou null si l'utilisateur a fermé le sélecteur.
-// identifiantFichierAttendu : fichier du lien d'invitation (le sélecteur ne propose que celui-là).
-export async function rejoindrePartage(
-  motDePasse: string,
-  identifiantFichierAttendu: string | null = null,
-): Promise<string | null> {
-  const jeton = () => obtenirJetonGoogle(true)
-  if (doitUtiliserRedirection() && !unJetonEstMemorise()) {
-    // iPhone : la page va partir chez Google puis revenir ; le mot de passe est gardé pour la reprise.
-    memoriserActionEnAttente('rejoindre', motDePasse, identifiantFichierAttendu)
-  }
-  const jetonObtenu = await jeton()
-  // La page n'a pas quitté l'application : aucune reprise à prévoir.
-  recupererActionEnAttente('rejoindre')
-  const fichier = await choisirFichierDrive(jetonObtenu, identifiantFichierAttendu)
-  if (fichier === null) {
-    return null
-  }
-  if (identifiantFichierAttendu !== null && fichier.identifiant !== identifiantFichierAttendu) {
-    throw new Error("Ce n'est pas le fichier de l'invitation. Choisissez le fichier proposé.")
-  }
-  const stockage = new StockageFichierDrive(fichier.identifiant, jeton)
-  const contenu = await stockage.lire()
-  if (contenu === null) {
-    throw new Error("Ce fichier est vide : ce n'est pas un profil de Suivi ABC.")
-  }
-  const sauvegarde = await lireSauvegardeDistante(contenu, motDePasse)
-  if (sauvegarde.profils.length !== 1) {
-    throw new Error("Ce fichier n'est pas un profil partagé de Suivi ABC.")
-  }
-  const profilId = sauvegarde.profils[0].id
-  if (trouverConfigurationPartage(profilId) !== undefined) {
-    throw new Error('Ce profil est déjà synchronisé sur cet appareil.')
-  }
-  await creerDepotLocalPourProfil(profilId).appliquerSauvegarde(sauvegarde)
-  await enregistrerConfigurations([
-    ...etatCourant.configurations,
-    { profilId, identifiantFichier: fichier.identifiant, motDePasse },
-  ])
-  installerDeclencheurs()
-  await synchroniserProfilsPartages(true)
-  oublierInvitation()
-  changerEtat({ ...etatCourant, profilRejointId: profilId })
-  return profilId
-}
-
-// Les données restent sur l'appareil ; seul le lien avec le fichier partagé est coupé.
-export async function arreterPartage(profilId: string): Promise<void> {
-  const configurations = etatCourant.configurations.filter(
-    (configuration) => configuration.profilId !== profilId,
-  )
-  const { [profilId]: _ignore, ...autresEtats } = etatCourant.parProfil
-  await enregistrerConfigurations(configurations)
-  changerEtat({ ...etatCourant, parProfil: autresEtats })
-}
-
-export async function synchroniserPartageMaintenant(): Promise<void> {
-  await synchroniserProfilsPartages(true)
-}
-
-function configurationObligatoire(profilId: string): ConfigurationPartage {
-  const configuration = trouverConfigurationPartage(profilId)
+function identifiantFichierObligatoire(profilId: string): string {
+  const configuration = trouverConfigurationProfil(profilId)
   if (configuration === undefined) {
-    throw new Error("Le partage n'est pas activé pour ce profil.")
+    throw new Error("Ce profil n'est pas encore synchronisé : appuyez d'abord sur « Synchroniser ».")
   }
-  return configuration
+  return configuration.identifiantFichier
 }
 
 export async function lireDroitsPartage(profilId: string): Promise<DroitsSurFichier> {
-  const { identifiantFichier } = configurationObligatoire(profilId)
-  return lireDroitsSurFichier(identifiantFichier, () => obtenirJetonGoogle(true))
+  return lireDroitsSurFichier(identifiantFichierObligatoire(profilId), () => obtenirJetonGoogle(true))
 }
 
 export async function listerAccesPartage(profilId: string): Promise<PersonneAvecAcces[]> {
-  const { identifiantFichier } = configurationObligatoire(profilId)
-  return listerPersonnesAvecAcces(identifiantFichier, () => obtenirJetonGoogle(true))
+  return listerPersonnesAvecAcces(identifiantFichierObligatoire(profilId), () => obtenirJetonGoogle(true))
 }
 
+// L'e-mail d'invitation envoyé par Google contient messageInvitation (le lien qui ouvre le profil).
 export async function inviterAccesPartage(
   profilId: string,
   adresseEmail: string,
   role: RolePartage,
   messageInvitation: string | null = null,
 ): Promise<void> {
-  const { identifiantFichier } = configurationObligatoire(profilId)
   await inviterPersonne(
-    identifiantFichier,
+    identifiantFichierObligatoire(profilId),
     adresseEmail,
     role,
     () => obtenirJetonGoogle(true),
@@ -415,6 +45,7 @@ export async function inviterAccesPartage(
 }
 
 export async function retirerAccesPartage(profilId: string, identifiantPermission: string): Promise<void> {
-  const { identifiantFichier } = configurationObligatoire(profilId)
-  await retirerAcces(identifiantFichier, identifiantPermission, () => obtenirJetonGoogle(true))
+  await retirerAcces(identifiantFichierObligatoire(profilId), identifiantPermission, () =>
+    obtenirJetonGoogle(true),
+  )
 }

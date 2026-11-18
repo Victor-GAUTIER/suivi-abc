@@ -16,13 +16,11 @@ import { InvitationProfil } from './composants/InvitationProfil'
 import { FormulaireEntree } from './composants/FormulaireEntree'
 import { Journal } from './composants/Journal'
 import { Parametres } from './composants/Parametres'
-import { RejoindreProfilPartage } from './composants/RejoindreProfilPartage'
 import { Statistiques } from './composants/Statistiques'
 import { extraireListesConnues } from './listes'
 import { lireInvitationMemorisee } from './partage/invitation'
-import { abonnerEtatPartage, initialiserPartage, lireEtatPartage } from './partage/gestionnairePartage'
-import { initialiserSynchro } from './synchro/gestionnaire'
-import { SynchroGoogleDrive } from './composants/SynchroGoogleDrive'
+import { abonnerEtatSynchro, initialiserSynchro, lireEtatSynchro } from './synchro/gestionnaire'
+import { BoutonSynchro } from './composants/BoutonSynchro'
 import type { EntreeABC, TypeComportement } from './types'
 
 type Onglet = 'saisie' | 'journal' | 'calendrier' | 'statistiques' | 'parametres'
@@ -43,7 +41,7 @@ export function App() {
   const [codeNouveauProfil, setCodeNouveauProfil] = useState('')
   const [initialisationTerminee, setInitialisationTerminee] = useState(false)
 
-  const etatPartage = useSyncExternalStore(abonnerEtatPartage, lireEtatPartage)
+  const etatPartage = useSyncExternalStore(abonnerEtatSynchro, lireEtatSynchro)
   const [invitation, setInvitation] = useState(lireInvitationMemorisee)
   const oublierInvitationAffichee = useCallback(() => setInvitation(null), [])
 
@@ -84,7 +82,6 @@ export function App() {
       }
       setInitialisationTerminee(true)
       void initialiserSynchro()
-      void initialiserPartage()
     }
     void initialiser()
   }, [])
@@ -175,14 +172,12 @@ export function App() {
         </form>
         <section className="carte-statistique accueil-synchro">
           <h2>Déjà utilisé sur un autre appareil ?</h2>
-          <SynchroGoogleDrive />
+          <p className="texte-aide">
+            Connectez-vous à Google : vos profils sont retrouvés automatiquement. Pour rejoindre un
+            profil partagé, ouvrez le lien reçu par e-mail.
+          </p>
+          <BoutonSynchro grand />
         </section>
-        {invitation === null && (
-          <section className="carte-statistique accueil-synchro">
-            <h2>Un profil a été partagé avec vous ?</h2>
-            <RejoindreProfilPartage surEcranAccueil />
-          </section>
-        )}
         <p className="texte-aide">
           Vous avez déjà une sauvegarde ? Créez un profil provisoire, puis importez le fichier dans
           Paramètres.
@@ -232,6 +227,7 @@ export function App() {
               +
             </button>
           </div>
+          <BoutonSynchro />
         </div>
 
         <nav className="onglets" aria-label="Menu principal">

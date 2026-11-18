@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import { elementsAEcrire } from '../fusion'
 import type { EntreeABC, Sauvegarde } from '../types'
 import { synchroniser } from './moteur'
-import { ErreurMotDePasse } from './types'
 import type { DepotLocal, StockageDistant } from './types'
 
 function creerEntree(identifiant: string, modifications: Partial<EntreeABC> = {}): EntreeABC {
@@ -78,17 +77,16 @@ function creerStockageEnMemoire(): StockageDistant & { contenu: string | null; n
 }
 
 describe('synchroniser', () => {
-  it('envoie un fichier chiffré au premier passage', async () => {
+  it('envoie un fichier JSON lisible au premier passage', async () => {
     const stockage = creerStockageEnMemoire()
     const telephone = creerAppareil(creerSauvegardeVide())
     telephone.donnees.entrees.push(creerEntree('e1'))
 
-    const resultat = await synchroniser(stockage, telephone, 'secret')
+    const resultat = await synchroniser(stockage, telephone)
 
     expect(resultat.envoye).toBe(true)
     expect(stockage.contenu).not.toBeNull()
-    expect(stockage.contenu).not.toContain('Cris')
-    expect(stockage.contenu).not.toContain('Salle de classe')
+    expect(JSON.parse(stockage.contenu ?? '').entrees).toHaveLength(1)
   })
 
   it("fait apparaître sur l'ordinateur ce qui a été saisi sur le téléphone", async () => {
@@ -97,8 +95,8 @@ describe('synchroniser', () => {
     telephone.donnees.entrees.push(creerEntree('e1'))
     const ordinateur = creerAppareil({ ...creerSauvegardeVide(), profils: [], typesComportement: [] })
 
-    await synchroniser(stockage, telephone, 'secret')
-    const resultat = await synchroniser(stockage, ordinateur, 'secret')
+    await synchroniser(stockage, telephone)
+    const resultat = await synchroniser(stockage, ordinateur)
 
     expect(resultat.elementsRecus).toBe(3)
     expect(ordinateur.donnees.entrees.map((entree) => entree.id)).toEqual(['e1'])
@@ -109,14 +107,14 @@ describe('synchroniser', () => {
     const stockage = creerStockageEnMemoire()
     const telephone = creerAppareil(creerSauvegardeVide())
     const ordinateur = creerAppareil(creerSauvegardeVide())
-    await synchroniser(stockage, telephone, 'secret')
-    await synchroniser(stockage, ordinateur, 'secret')
+    await synchroniser(stockage, telephone)
+    await synchroniser(stockage, ordinateur)
 
     telephone.donnees.entrees.push(creerEntree('e-telephone'))
     ordinateur.donnees.entrees.push(creerEntree('e-ordinateur'))
-    await synchroniser(stockage, telephone, 'secret')
-    await synchroniser(stockage, ordinateur, 'secret')
-    await synchroniser(stockage, telephone, 'secret')
+    await synchroniser(stockage, telephone)
+    await synchroniser(stockage, ordinateur)
+    await synchroniser(stockage, telephone)
 
     const identifiantsTelephone = telephone.donnees.entrees.map((entree) => entree.id).sort()
     const identifiantsOrdinateur = ordinateur.donnees.entrees.map((entree) => entree.id).sort()
@@ -128,19 +126,19 @@ describe('synchroniser', () => {
     const stockage = creerStockageEnMemoire()
     const telephone = creerAppareil(creerSauvegardeVide())
     const ordinateur = creerAppareil(creerSauvegardeVide())
-    await synchroniser(stockage, telephone, 'secret')
+    await synchroniser(stockage, telephone)
 
     telephone.donnees.entrees.push(creerEntree('e-telephone'))
     ordinateur.donnees.entrees.push(creerEntree('e-ordinateur'))
     // Les deux lisent le même fichier distant, puis le second écrase le premier.
     const contenuAvant = stockage.contenu
-    await synchroniser(stockage, telephone, 'secret')
+    await synchroniser(stockage, telephone)
     stockage.contenu = contenuAvant
-    await synchroniser(stockage, ordinateur, 'secret')
+    await synchroniser(stockage, ordinateur)
 
     // Le fichier distant ne contient plus e-telephone, mais le téléphone l'a toujours.
-    await synchroniser(stockage, telephone, 'secret')
-    await synchroniser(stockage, ordinateur, 'secret')
+    await synchroniser(stockage, telephone)
+    await synchroniser(stockage, ordinateur)
     expect(ordinateur.donnees.entrees.map((entree) => entree.id).sort()).toEqual(['e-ordinateur', 'e-telephone'])
   })
 
@@ -149,16 +147,16 @@ describe('synchroniser', () => {
     const telephone = creerAppareil(creerSauvegardeVide())
     telephone.donnees.entrees.push(creerEntree('e1'), creerEntree('e2'))
     const ordinateur = creerAppareil(creerSauvegardeVide())
-    await synchroniser(stockage, telephone, 'secret')
-    await synchroniser(stockage, ordinateur, 'secret')
+    await synchroniser(stockage, telephone)
+    await synchroniser(stockage, ordinateur)
 
     ordinateur.donnees.entrees = ordinateur.donnees.entrees.map((entree) =>
       entree.id === 'e1'
         ? { ...entree, supprime: true, modifieLe: '2026-10-10T08:00:00.000Z' }
         : { ...entree, comportement: 'Agitation', modifieLe: '2026-10-10T08:05:00.000Z' },
     )
-    await synchroniser(stockage, ordinateur, 'secret')
-    await synchroniser(stockage, telephone, 'secret')
+    await synchroniser(stockage, ordinateur)
+    await synchroniser(stockage, telephone)
 
     const entreeSupprimee = telephone.donnees.entrees.find((entree) => entree.id === 'e1')
     const entreeModifiee = telephone.donnees.entrees.find((entree) => entree.id === 'e2')
@@ -170,35 +168,26 @@ describe('synchroniser', () => {
     const stockage = creerStockageEnMemoire()
     const telephone = creerAppareil(creerSauvegardeVide())
     telephone.donnees.entrees.push(creerEntree('e1'))
-    await synchroniser(stockage, telephone, 'secret')
+    await synchroniser(stockage, telephone)
     const ecrituresAvant = stockage.nombreEcritures
 
-    const resultat = await synchroniser(stockage, telephone, 'secret')
+    const resultat = await synchroniser(stockage, telephone)
 
     expect(resultat.envoye).toBe(false)
     expect(resultat.elementsRecus).toBe(0)
     expect(stockage.nombreEcritures).toBe(ecrituresAvant)
   })
 
-  it("refuse un mauvais mot de passe sans toucher au fichier ni aux données locales", async () => {
+  it("refuse un ancien fichier chiffré sans toucher au fichier ni aux données locales", async () => {
     const stockage = creerStockageEnMemoire()
-    const telephone = creerAppareil(creerSauvegardeVide())
-    telephone.donnees.entrees.push(creerEntree('e1'))
-    await synchroniser(stockage, telephone, 'bon-mot-de-passe')
+    stockage.contenu = JSON.stringify({ version: 1, chiffre: true, sel: 'x', vecteurInitialisation: 'y', donnees: 'z' })
     const contenuAvant = stockage.contenu
     const ordinateur = creerAppareil(creerSauvegardeVide())
 
-    await expect(synchroniser(stockage, ordinateur, 'mauvais')).rejects.toBeInstanceOf(ErreurMotDePasse)
+    await expect(synchroniser(stockage, ordinateur)).rejects.toThrow(/ancienne version/)
 
     expect(stockage.contenu).toBe(contenuAvant)
     expect(ordinateur.donnees.entrees).toHaveLength(0)
-  })
-
-  it('refuse de synchroniser sans mot de passe', async () => {
-    const stockage = creerStockageEnMemoire()
-    const telephone = creerAppareil(creerSauvegardeVide())
-    await expect(synchroniser(stockage, telephone, '')).rejects.toBeInstanceOf(ErreurMotDePasse)
-    expect(stockage.contenu).toBeNull()
   })
 })
 

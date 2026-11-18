@@ -2,7 +2,7 @@ import { appelerDrive, URL_API_DRIVE, URL_API_TELEVERSEMENT } from './appelerDri
 import type { FonctionFetch } from './appelerDrive'
 import type { StockageDistant } from './types'
 
-const NOM_FICHIER_SYNCHRO = 'suivi-abc-synchro.json'
+export const PREFIXE_NOM_FICHIER_PROFIL = 'Suivi ABC - profil'
 
 function construireCorpsMultipart(
   separateur: string,
@@ -14,71 +14,6 @@ function construireCorpsMultipart(
     `--${separateur}\r\nContent-Type: application/json\r\n\r\n${contenu}\r\n` +
     `--${separateur}--`
   )
-}
-
-// Stockage dans le dossier caché de l'application sur le Google Drive de l'utilisateur
-// (espace « appDataFolder » : invisible dans Drive et inaccessible aux autres applications).
-export class StockageGoogleDrive implements StockageDistant {
-  private identifiantFichier: string | null = null
-
-  constructor(
-    private readonly obtenirJeton: () => Promise<string>,
-    private readonly appelerReseau: FonctionFetch = (...parametres) => fetch(...parametres),
-  ) {}
-
-  private appeler(url: string, options: RequestInit = {}): Promise<Response> {
-    return appelerDrive(this.obtenirJeton, this.appelerReseau, url, options)
-  }
-
-  private async trouverIdentifiantFichier(): Promise<string | null> {
-    if (this.identifiantFichier !== null) {
-      return this.identifiantFichier
-    }
-    const requete = `name='${NOM_FICHIER_SYNCHRO}' and trashed=false`
-    // Si deux appareils créent le fichier en même temps, il en existe deux. Le tri par date de
-    // création fait choisir le même (le plus ancien) sur tous les appareils : ils convergent.
-    const url =
-      `${URL_API_DRIVE}?spaces=appDataFolder&pageSize=10&fields=files(id)` +
-      `&orderBy=createdTime&q=${encodeURIComponent(requete)}`
-    const reponse = await this.appeler(url)
-    const resultat = (await reponse.json()) as { files?: Array<{ id: string }> }
-    this.identifiantFichier = resultat.files?.[0]?.id ?? null
-    return this.identifiantFichier
-  }
-
-  async lire(): Promise<string | null> {
-    const identifiant = await this.trouverIdentifiantFichier()
-    if (identifiant === null) {
-      return null
-    }
-    const reponse = await this.appeler(`${URL_API_DRIVE}/${identifiant}?alt=media`)
-    return reponse.text()
-  }
-
-  async ecrire(contenu: string): Promise<void> {
-    const identifiant = await this.trouverIdentifiantFichier()
-    if (identifiant !== null) {
-      await this.appeler(`${URL_API_TELEVERSEMENT}/${identifiant}?uploadType=media`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: contenu,
-      })
-      return
-    }
-    const separateur = `suivi-abc-${crypto.randomUUID()}`
-    const corps = construireCorpsMultipart(
-      separateur,
-      { name: NOM_FICHIER_SYNCHRO, parents: ['appDataFolder'], mimeType: 'application/json' },
-      contenu,
-    )
-    const reponse = await this.appeler(`${URL_API_TELEVERSEMENT}?uploadType=multipart&fields=id`, {
-      method: 'POST',
-      headers: { 'Content-Type': `multipart/related; boundary=${separateur}` },
-      body: corps,
-    })
-    const resultat = (await reponse.json()) as { id?: string }
-    this.identifiantFichier = resultat.id ?? null
-  }
 }
 
 // Fichier ordinaire (visible dans « Mon Drive »), identifié par son id : c'est lui qu'on partage.
@@ -141,4 +76,24 @@ export async function creerFichierDrive(
     throw new Error("Google Drive n'a pas renvoyé l'identifiant du fichier créé.")
   }
   return resultat.id
+}
+
+export interface FichierProfilDrive {
+  identifiant: string
+  nom: string
+}
+
+// Liste les fichiers de profil que l'application peut voir dans le Drive de l'utilisateur :
+// ceux qu'elle a créés (sur n'importe quel appareil) et ceux qu'il a choisis dans le sélecteur Google.
+export async function listerFichiersProfils(
+  obtenirJeton: () => Promise<string>,
+  appelerReseau: FonctionFetch = (...parametres) => fetch(...parametres),
+): Promise<FichierProfilDrive[]> {
+  const requete = `name contains '${PREFIXE_NOM_FICHIER_PROFIL}' and trashed=false`
+  const url =
+    `${URL_API_DRIVE}?spaces=drive&pageSize=100&orderBy=createdTime&fields=files(id,name)` +
+    `&q=${encodeURIComponent(requete)}`
+  const reponse = await appelerDrive(obtenirJeton, appelerReseau, url)
+  const resultat = (await reponse.json()) as { files?: Array<{ id: string; name?: string }> }
+  return (resultat.files ?? []).map((fichier) => ({ identifiant: fichier.id, nom: fichier.name ?? '' }))
 }

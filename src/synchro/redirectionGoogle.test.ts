@@ -102,15 +102,13 @@ describe('actions en attente', () => {
     })
     const { memoriserActionEnAttente, recupererActionEnAttente } = await import('./redirectionGoogle')
 
-    memoriserActionEnAttente('rejoindre', 'secret-1', 'fichier-1')
-    memoriserActionEnAttente('synchro', 'secret-2')
+    memoriserActionEnAttente('rejoindre', 'fichier-1')
+    memoriserActionEnAttente('synchro')
     expect(recupererActionEnAttente('rejoindre')).toEqual({
-      motDePasse: 'secret-1',
       identifiantFichier: 'fichier-1',
     })
     expect(recupererActionEnAttente('rejoindre')).toBeNull()
     expect(recupererActionEnAttente('synchro')).toEqual({
-      motDePasse: 'secret-2',
       identifiantFichier: null,
     })
 

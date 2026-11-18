@@ -1,6 +1,6 @@
 import type { Sauvegarde } from '../types'
 
-// Un stockage distant est un simple fichier texte (ici : le fichier chiffré de la synchro).
+// Un stockage distant est un simple fichier texte (ici : le fichier JSON d'un profil dans Drive).
 export interface StockageDistant {
   // Renvoie le contenu du fichier distant, ou null s'il n'existe pas encore.
   lire: () => Promise<string | null>
@@ -19,8 +19,6 @@ export interface ResultatSynchro {
   envoye: boolean
   termineLe: string
 }
-
-export class ErreurMotDePasse extends Error {}
 
 export class ErreurAuthentificationGoogle extends Error {}
 

@@ -21,8 +21,8 @@ import {
 } from '../sauvegarde'
 import { telechargerTexte } from '../telechargement'
 import { PartageProfils } from './PartageProfils'
-import { SynchroGlobale } from './SynchroGlobale'
-import { SynchroGoogleDrive } from './SynchroGoogleDrive'
+import { BoutonSynchro } from './BoutonSynchro'
+import { deconnecterGoogle } from '../synchro/gestionnaire'
 import { THEMES, appliquerTheme, lireThemeMemorise } from '../themes'
 import type { IdentifiantTheme } from '../themes'
 import type { EnveloppeChiffree, EntreeABC, Profil, TypeComportement } from '../types'
@@ -302,8 +302,21 @@ export function Parametres({
 
       <section className="carte-statistique">
         <h3>Synchronisation Google Drive</h3>
-        <SynchroGlobale />
-        <SynchroGoogleDrive integree />
+        <p className="texte-aide">
+          Un seul bouton : il vous connecte à Google, retrouve vos profils sur cet appareil et
+          synchronise tout. Les données sont enregistrées dans votre Google Drive (un fichier par
+          profil) ; Google peut les lire.
+        </p>
+        <BoutonSynchro grand />
+        <div className="formulaire-actions">
+          <button
+            type="button"
+            className="bouton-secondaire"
+            onClick={() => void deconnecterGoogle()}
+          >
+            Se déconnecter de Google
+          </button>
+        </div>
         <PartageProfils profils={profils} profilActifId={profilActifId} />
       </section>
 

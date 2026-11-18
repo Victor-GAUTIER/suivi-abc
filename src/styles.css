@@ -141,6 +141,9 @@ h3 {
 }
 
 .barre-laterale {
+  position: sticky;
+  top: 0;
+  z-index: 9;
   background-color: var(--couleur-barre);
   color: #ffffff;
 }
@@ -156,6 +159,67 @@ h3 {
 .identite h1 {
   margin: 0;
   font-size: 1.15rem;
+}
+
+.identite {
+  flex-wrap: wrap;
+}
+
+.synchro-rapide {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.bouton-synchro {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.bouton-synchro-compact {
+  min-width: 2.5rem;
+  min-height: 2.5rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 8px;
+  background: transparent;
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.bouton-synchro-compact:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.bouton-synchro-compact .synchro-libelle {
+  display: none;
+}
+
+.synchro-message {
+  margin: 0;
+  padding: 0.35rem 0.5rem;
+  border-radius: 6px;
+  background: #ffffff;
+  font-size: 0.85rem;
+}
+
+.icone-tournante {
+  display: inline-flex;
+  animation: rotation-synchro 1s linear infinite;
+}
+
+@keyframes rotation-synchro {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .icone-tournante {
+    animation: none;
+  }
 }
 
 .profil-actif {
@@ -638,6 +702,10 @@ button {
 
   .profil-actif .selecteur-profil {
     flex: 1;
+  }
+
+  .bouton-synchro-compact .synchro-libelle {
+    display: inline;
   }
 
   .selecteur-profil select {

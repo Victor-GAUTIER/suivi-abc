@@ -1,26 +1,19 @@
 import { maintenantHorodatage } from '../dates'
 import { elementsAEcrire } from '../fusion'
-import { dechiffrerSauvegarde, lireContenuFichier, serialiserSauvegarde } from '../sauvegarde'
+import { lireContenuFichier } from '../sauvegarde'
 import type { Sauvegarde } from '../types'
-import { ErreurMotDePasse } from './types'
 import type { DepotLocal, ResultatSynchro, StockageDistant } from './types'
 
-export async function lireSauvegardeDistante(
-  contenuDistant: string,
-  motDePasse: string,
-): Promise<Sauvegarde> {
+// Les fichiers de synchro sont du JSON lisible (non chiffré). Un fichier chiffré est un reste
+// d'une ancienne version de l'application : il n'est plus utilisé.
+export function lireSauvegardeDistante(contenuDistant: string): Sauvegarde {
   const contenuLu = lireContenuFichier(contenuDistant)
-  if (contenuLu.type === 'clair') {
-    return contenuLu.sauvegarde
-  }
-  try {
-    return await dechiffrerSauvegarde(contenuLu.enveloppe, motDePasse)
-  } catch (erreur) {
-    const messageOriginal = erreur instanceof Error ? erreur.message : ''
-    throw new ErreurMotDePasse(
-      messageOriginal === '' ? 'Mot de passe incorrect ou fichier corrompu.' : messageOriginal,
+  if (contenuLu.type === 'chiffre') {
+    throw new Error(
+      "Ce fichier a été créé par une ancienne version de l'application (il est chiffré) : il n'est plus utilisé.",
     )
   }
+  return contenuLu.sauvegarde
 }
 
 // Le fichier distant n'a rien à gagner si aucun élément local n'est nouveau ou plus récent.
@@ -41,15 +34,9 @@ function distantEstDejaAJour(sauvegardeLocale: Sauvegarde, sauvegardeDistante: S
 export async function synchroniser(
   stockage: StockageDistant,
   depotLocal: DepotLocal,
-  motDePasse: string,
 ): Promise<ResultatSynchro> {
-  if (motDePasse === '') {
-    throw new ErreurMotDePasse('Un mot de passe de chiffrement est nécessaire pour synchroniser.')
-  }
-
   const contenuDistant = await stockage.lire()
-  const sauvegardeDistante =
-    contenuDistant === null ? null : await lireSauvegardeDistante(contenuDistant, motDePasse)
+  const sauvegardeDistante = contenuDistant === null ? null : lireSauvegardeDistante(contenuDistant)
 
   const elementsRecus =
     sauvegardeDistante === null ? 0 : await depotLocal.appliquerSauvegarde(sauvegardeDistante)
@@ -59,8 +46,7 @@ export async function synchroniser(
     sauvegardeDistante === null || !distantEstDejaAJour(sauvegardeLocale, sauvegardeDistante)
 
   if (doitEnvoyer) {
-    const contenuChiffre = await serialiserSauvegarde(sauvegardeLocale, motDePasse)
-    await stockage.ecrire(contenuChiffre)
+    await stockage.ecrire(JSON.stringify(sauvegardeLocale))
   }
 
   return { elementsRecus, envoye: doitEnvoyer, termineLe: maintenantHorodatage() }
